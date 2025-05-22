@@ -2,169 +2,200 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Encuesta en Vivo</title>
   <style>
     body {
-      font-family: "Segoe UI", sans-serif;
-      background: #f0f4f8;
+      background: #f3f4f6;
+      font-family: 'Segoe UI', sans-serif;
+      color: #111827;
       display: flex;
-      justify-content: center;
+      flex-direction: column;
       align-items: center;
-      height: 100vh;
-      margin: 0;
+      padding: 2rem;
     }
 
-    .container {
+    .card {
       background: white;
+      border-radius: 1rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       padding: 2rem;
-      border-radius: 16px;
-      box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
       max-width: 600px;
       width: 100%;
+      margin-bottom: 2rem;
     }
 
-    h1 {
-      margin-top: 0;
-      font-size: 1.8rem;
-      text-align: center;
-      color: #333;
-    }
-
-    .question {
-      font-size: 1.2rem;
+    h2 {
+      font-size: 1.5rem;
       margin-bottom: 1rem;
+      text-align: center;
     }
 
     .option {
-      background: #e3eaf3;
-      border-radius: 8px;
-      padding: 10px 15px;
-      margin: 8px 0;
+      background: #e5e7eb;
+      padding: 0.75rem 1rem;
+      border-radius: 0.75rem;
+      margin: 0.5rem 0;
       cursor: pointer;
-      transition: 0.3s;
+      transition: 0.2s ease;
     }
 
     .option:hover {
-      background: #c7d7ec;
+      background: #d1d5db;
     }
 
-    .results {
-      margin-top: 1rem;
+    .option.disabled {
+      pointer-events: none;
+      opacity: 0.6;
     }
 
-    .result-bar {
-      background: #4caf50;
-      height: 20px;
-      border-radius: 10px;
+    .bar-container {
+      background: #e5e7eb;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      height: 1.2rem;
+      margin-top: 0.3rem;
+    }
+
+    .bar {
+      height: 100%;
+      background: #60a5fa;
+      transition: width 0.4s ease;
     }
 
     .next-btn {
       margin-top: 1.5rem;
-      padding: 10px 20px;
-      background-color: #007bff;
+      padding: 0.75rem 1.5rem;
+      background: #3b82f6;
       color: white;
       border: none;
-      border-radius: 8px;
+      border-radius: 0.5rem;
       cursor: pointer;
       display: none;
     }
 
     .next-btn:hover {
-      background-color: #0056b3;
+      background: #2563eb;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Encuesta en Vivo</h1>
-    <div id="quiz">
-      <div class="question" id="question"></div>
-      <div id="options"></div>
-      <div class="results" id="results"></div>
-      <button class="next-btn" id="nextBtn">Siguiente</button>
-    </div>
+  <div class="card">
+    <h2 id="question">Cargando pregunta...</h2>
+    <div id="options"></div>
+    <button id="nextBtn" class="next-btn">Siguiente</button>
   </div>
 
-  <script>
+  <!-- Firebase scripts -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getDatabase, ref, push, onValue, increment, update, get, child } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+
+    // 🔧 Reemplazá esto con tu config real
+    const firebaseConfig = {
+      apiKey: "TU_API_KEY",
+      authDomain: "TU_PROYECTO.firebaseapp.com",
+      databaseURL: "https://TU_PROYECTO-default-rtdb.firebaseio.com",
+      projectId: "TU_PROYECTO",
+      storageBucket: "TU_PROYECTO.appspot.com",
+      messagingSenderId: "XXXXXX",
+      appId: "APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
     const questions = [
       {
         text: "¿Cuál es tu color favorito?",
         options: ["Rojo", "Azul", "Verde", "Amarillo"]
       },
       {
-        text: "¿Qué preferís tomar?",
-        options: ["Café", "Té", "Mate", "Agua"]
+        text: "¿Cuál es tu animal favorito?",
+        options: ["Perro", "Gato", "Pez", "Pájaro"]
       },
       {
-        text: "¿Qué sistema operativo usás?",
-        options: ["Windows", "macOS", "Linux", "Otro"]
+        text: "¿Qué estación preferís?",
+        options: ["Verano", "Invierno", "Otoño", "Primavera"]
       }
     ];
 
     let current = 0;
 
-    function showQuestion() {
-      document.getElementById("results").innerHTML = "";
-      document.getElementById("nextBtn").style.display = "none";
+    const questionEl = document.getElementById("question");
+    const optionsEl = document.getElementById("options");
+    const nextBtn = document.getElementById("nextBtn");
+
+    function loadQuestion() {
       const q = questions[current];
-      document.getElementById("question").innerText = q.text;
-      const optionsDiv = document.getElementById("options");
-      optionsDiv.innerHTML = "";
-      q.options.forEach((opt, index) => {
+      questionEl.textContent = q.text;
+      optionsEl.innerHTML = "";
+      nextBtn.style.display = "none";
+
+      q.options.forEach((opt, idx) => {
         const div = document.createElement("div");
         div.className = "option";
-        div.innerText = opt;
-        div.onclick = () => selectOption(index);
-        optionsDiv.appendChild(div);
+        div.textContent = opt;
+        div.onclick = () => vote(idx);
+        optionsEl.appendChild(div);
+      });
+
+      listenResults();
+    }
+
+    function vote(index) {
+      const qKey = `q${current}`;
+      const option = questions[current].options[index];
+      const voteRef = ref(db, `votes/${qKey}/${option}`);
+      update(voteRef, { ".value": increment(1) });
+
+      document.querySelectorAll(".option").forEach((el) => {
+        el.classList.add("disabled");
+        if (el.textContent === option) {
+          el.style.background = "#a5f3fc";
+        }
+      });
+
+      nextBtn.style.display = current < questions.length - 1 ? "inline-block" : "none";
+    }
+
+    function listenResults() {
+      const qKey = `q${current}`;
+      const qRef = ref(db, `votes/${qKey}`);
+      onValue(qRef, (snapshot) => {
+        const data = snapshot.val() || {};
+        const total = Object.values(data).reduce((a, b) => a + b, 0);
+        document.querySelectorAll(".option").forEach((el) => {
+          const count = data[el.textContent] || 0;
+          const percent = total ? Math.round((count / total) * 100) : 0;
+
+          // Agrega barra si no existe
+          let bar = el.querySelector(".bar");
+          if (!bar) {
+            const container = document.createElement("div");
+            container.className = "bar-container";
+            bar = document.createElement("div");
+            bar.className = "bar";
+            container.appendChild(bar);
+            el.appendChild(container);
+          }
+          bar.style.width = `${percent}%`;
+        });
       });
     }
 
-    function selectOption(selectedIndex) {
-      const totalVotes = 100;
-      const resultsDiv = document.getElementById("results");
-      resultsDiv.innerHTML = "";
-
-      // Generar porcentajes aleatorios que sumen 100
-      let remaining = totalVotes;
-      const percentages = questions[current].options.map((_, i) => {
-        if (i === questions[current].options.length - 1) return remaining;
-        const value = Math.floor(Math.random() * (remaining / 2));
-        remaining -= value;
-        return value;
-      });
-
-      // Asegurarse que el índice seleccionado sea el que tenga el valor más alto (simulado)
-      percentages[selectedIndex] += 15;
-
-      questions[current].options.forEach((opt, i) => {
-        const percent = Math.min(percentages[i], 100);
-        const label = document.createElement("div");
-        label.innerText = `${opt}: ${percent}%`;
-        const bar = document.createElement("div");
-        bar.className = "result-bar";
-        bar.style.width = percent + "%";
-        bar.style.marginBottom = "8px";
-        resultsDiv.appendChild(label);
-        resultsDiv.appendChild(bar);
-      });
-
-      document.querySelectorAll(".option").forEach(el => {
-        el.style.pointerEvents = "none";
-        el.style.opacity = 0.6;
-      });
-
-      document.getElementById("nextBtn").style.display = current < questions.length - 1 ? "inline-block" : "none";
-    }
-
-    document.getElementById("nextBtn").onclick = () => {
+    nextBtn.onclick = () => {
       current++;
       if (current < questions.length) {
-        showQuestion();
+        loadQuestion();
+      } else {
+        questionEl.textContent = "¡Gracias por responder!";
+        optionsEl.innerHTML = "";
+        nextBtn.style.display = "none";
       }
     };
 
-    showQuestion();
+    loadQuestion();
   </script>
 </body>
 </html>
