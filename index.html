@@ -2,95 +2,59 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Encuesta en Vivo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Encuesta Firebase + QR</title>
   <style>
-    body {
-      background: #f3f4f6;
-      font-family: 'Segoe UI', sans-serif;
-      color: #111827;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 2rem;
-    }
-
-    .card {
-      background: white;
-      border-radius: 1rem;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      padding: 2rem;
-      max-width: 600px;
-      width: 100%;
-      margin-bottom: 2rem;
-    }
-
-    h2 {
-      font-size: 1.5rem;
-      margin-bottom: 1rem;
-      text-align: center;
-    }
-
+    body { font-family: Arial, sans-serif; max-width: 500px; margin: 2rem auto; padding: 0 1rem; }
+    h2 { text-align: center; }
     .option {
-      background: #e5e7eb;
-      padding: 0.75rem 1rem;
-      border-radius: 0.75rem;
+      background: #f0f0f0;
       margin: 0.5rem 0;
+      padding: 0.7rem 1rem;
       cursor: pointer;
-      transition: 0.2s ease;
+      border-radius: 6px;
+      transition: background 0.3s;
+      user-select: none;
     }
-
-    .option:hover {
-      background: #d1d5db;
+    .option:hover:not(.disabled) { background: #cceeff; }
+    .option.disabled { cursor: default; opacity: 0.7; }
+    .progress-bar {
+      background: #a5f3fc;
+      height: 20px;
+      border-radius: 6px;
+      transition: width 0.5s ease;
     }
-
-    .option.disabled {
-      pointer-events: none;
-      opacity: 0.6;
-    }
-
-    .bar-container {
-      background: #e5e7eb;
-      border-radius: 0.5rem;
-      overflow: hidden;
-      height: 1.2rem;
-      margin-top: 0.3rem;
-    }
-
-    .bar {
-      height: 100%;
-      background: #60a5fa;
-      transition: width 0.4s ease;
-    }
-
-    .next-btn {
-      margin-top: 1.5rem;
-      padding: 0.75rem 1.5rem;
-      background: #3b82f6;
-      color: white;
-      border: none;
-      border-radius: 0.5rem;
-      cursor: pointer;
+    .option-container { margin-bottom: 1rem; }
+    #next-btn {
       display: none;
-    }
-
-    .next-btn:hover {
-      background: #2563eb;
+      margin-top: 1rem;
+      padding: 0.6rem 1.2rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      background-color: #0288d1;
+      color: white;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h2 id="question">Cargando pregunta...</h2>
-    <div id="options"></div>
-    <button id="nextBtn" class="next-btn">Siguiente</button>
-  </div>
 
-  <!-- Firebase scripts -->
+  <h2>Encuesta</h2>
+  <div id="question-container">
+    <p id="question-text">Cargando pregunta...</p>
+    <div id="options"></div>
+  </div>
+  <button id="next-btn">Siguiente pregunta</button>
+
+  <!-- Donde quieras mostrar el QR -->
+  <div id="qr-code" style="text-align:center; margin-top: 2rem;"></div>
+
   <script type="module">
-    import { initializeApp } from "firebase/app";
-    import { getDatabase, ref, push, onValue, increment, update, get, child } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
-    
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getDatabase, ref, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+
+    // Tu configuración Firebase:
     const firebaseConfig = {
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
       authDomain: "poll-e8e49.firebaseapp.com",
@@ -106,95 +70,132 @@
 
     const questions = [
       {
-        text: "¿Cuál es tu color favorito?",
-        options: ["Rojo", "Azul", "Verde", "Amarillo"]
+        question: "¿Cuál es tu color favorito?",
+        options: ["Rojo", "Azul", "Verde", "Amarillo"],
       },
       {
-        text: "¿Cuál es tu animal favorito?",
-        options: ["Perro", "Gato", "Pez", "Pájaro"]
+        question: "¿Cuál es tu animal favorito?",
+        options: ["Perro", "Gato", "Pez", "Pájaro"],
       },
       {
-        text: "¿Qué estación preferís?",
-        options: ["Verano", "Invierno", "Otoño", "Primavera"]
-      }
+        question: "¿Cuál es tu estación favorita?",
+        options: ["Verano", "Invierno", "Otoño", "Primavera"],
+      },
     ];
 
     let current = 0;
+    const questionText = document.getElementById("question-text");
+    const optionsDiv = document.getElementById("options");
+    const nextBtn = document.getElementById("next-btn");
 
-    const questionEl = document.getElementById("question");
-    const optionsEl = document.getElementById("options");
-    const nextBtn = document.getElementById("nextBtn");
-
-    function loadQuestion() {
+    // Mostrar pregunta y opciones
+    function showQuestion() {
       const q = questions[current];
-      questionEl.textContent = q.text;
-      optionsEl.innerHTML = "";
-      nextBtn.style.display = "none";
+      questionText.textContent = q.question;
+      optionsDiv.innerHTML = "";
 
-      q.options.forEach((opt, idx) => {
+      q.options.forEach((opt) => {
         const div = document.createElement("div");
         div.className = "option";
         div.textContent = opt;
-        div.onclick = () => vote(idx);
-        optionsEl.appendChild(div);
+
+        const progress = document.createElement("div");
+        progress.className = "progress-bar";
+        progress.style.width = "0%";
+        progress.style.marginTop = "4px";
+
+        const container = document.createElement("div");
+        container.className = "option-container";
+        container.appendChild(div);
+        container.appendChild(progress);
+
+        div.addEventListener("click", () => vote(opt));
+
+        optionsDiv.appendChild(container);
       });
 
-      listenResults();
+      nextBtn.style.display = "none";
     }
 
-    function vote(index) {
+    // Votar incrementando en Firebase con transacción
+    function vote(option) {
       const qKey = `q${current}`;
-      const option = questions[current].options[index];
       const voteRef = ref(db, `votes/${qKey}/${option}`);
-      update(voteRef, { ".value": increment(1) });
 
-      document.querySelectorAll(".option").forEach((el) => {
-        el.classList.add("disabled");
-        if (el.textContent === option) {
-          el.style.background = "#a5f3fc";
-        }
-      });
-
-      nextBtn.style.display = current < questions.length - 1 ? "inline-block" : "none";
-    }
-
-    function listenResults() {
-      const qKey = `q${current}`;
-      const qRef = ref(db, `votes/${qKey}`);
-      onValue(qRef, (snapshot) => {
-        const data = snapshot.val() || {};
-        const total = Object.values(data).reduce((a, b) => a + b, 0);
+      runTransaction(voteRef, (currentValue) => {
+        return (currentValue || 0) + 1;
+      })
+      .then(() => {
+        // Bloquear opciones y mostrar selección
         document.querySelectorAll(".option").forEach((el) => {
-          const count = data[el.textContent] || 0;
-          const percent = total ? Math.round((count / total) * 100) : 0;
-
-          // Agrega barra si no existe
-          let bar = el.querySelector(".bar");
-          if (!bar) {
-            const container = document.createElement("div");
-            container.className = "bar-container";
-            bar = document.createElement("div");
-            bar.className = "bar";
-            container.appendChild(bar);
-            el.appendChild(container);
+          el.classList.add("disabled");
+          if (el.textContent === option) {
+            el.style.backgroundColor = "#a5f3fc";
           }
-          bar.style.width = `${percent}%`;
         });
+        nextBtn.style.display = current < questions.length - 1 ? "inline-block" : "none";
+      })
+      .catch((error) => {
+        console.error("Error registrando voto:", error);
       });
     }
 
-    nextBtn.onclick = () => {
+    // Actualizar barras con datos de Firebase
+    function updateVotesDisplay(votes) {
+      const qKey = `q${current}`;
+      if (!votes || !votes[qKey]) return;
+
+      const totalVotes = Object.values(votes[qKey]).reduce((a, b) => a + b, 0);
+      if (totalVotes === 0) return;
+
+      const optionContainers = optionsDiv.querySelectorAll(".option-container");
+
+      optionContainers.forEach((container) => {
+        const optText = container.querySelector(".option").textContent;
+        const count = votes[qKey][optText] || 0;
+        const percent = ((count / totalVotes) * 100).toFixed(1);
+
+        const progress = container.querySelector(".progress-bar");
+        progress.style.width = percent + "%";
+        progress.textContent = percent + "%";
+      });
+    }
+
+    // Listener para los votos en Firebase
+    const votesRef = ref(db, "votes");
+    onValue(votesRef, (snapshot) => {
+      const votes = snapshot.val();
+      updateVotesDisplay(votes);
+    });
+
+    nextBtn.addEventListener("click", () => {
       current++;
       if (current < questions.length) {
-        loadQuestion();
-      } else {
-        questionEl.textContent = "¡Gracias por responder!";
-        optionsEl.innerHTML = "";
-        nextBtn.style.display = "none";
+        showQuestion();
       }
-    };
+    });
 
-    loadQuestion();
+    showQuestion();
+
+    // -------------------------
+    // Código para generar QR (opcional)
+    // -------------------------
+    import { toDataURL } from "https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.esm.js";
+
+    (async () => {
+      const url = window.location.href; // o la URL que quieras compartir
+      try {
+        const dataUrl = await toDataURL(url);
+        const img = document.createElement("img");
+        img.src = dataUrl;
+        img.alt = "QR code para la encuesta";
+        img.style.width = "150px";
+        document.getElementById("qr-code").appendChild(img);
+      } catch (e) {
+        console.error("Error generando QR:", e);
+      }
+    })();
+
   </script>
 </body>
 </html>
