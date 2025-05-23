@@ -137,7 +137,10 @@
         cdDiv.textContent = `Tiempo restante: ${t}s`;
         if (t <= 0) {
           clearInterval(timerHandle);
-          Array.from(optsDiv.children).forEach(b => b.disabled = true);
+          Array.from(optsDiv.children).forEach(b => {
+            b.disabled = true;
+            b.classList.add("voted");
+          });
           cdDiv.textContent = "Esperando siguiente pregunta…";
         }
       }, 1000);
