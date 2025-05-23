@@ -6,8 +6,8 @@
 :root {
   --primary: #1abc9c;
   --secondary: #16a085;
-  --background-start: #a8edea;
-  --background-end: #fed6e3;
+  --background-start: #a1ffce; /* verde menta */
+  --background-end: #faffd1;   /* verde amarillento claro */
   --chart-bg: rgba(255, 255, 255, 0.85);
   --text-dark: #2c3e50;
 }
