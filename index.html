@@ -1,15 +1,24 @@
 <!DOCTYPE html>
 <html lang="es">
-<meta charset="UTF-8" />
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Encuesta</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="index_style.css">
+  <link rel="stylesheet" href="estilos.css" />
+</head>
+<body>
+  <h1>¡Bienvenido a la encuesta!</h1>
+  <div id="waiting">Esperando que el host inicie la encuesta...</div>
+  <div id="question-section" style="display: none;">
+    <div id="question-text"></div>
+    <div id="options"></div>
+  </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import { getDatabase, ref, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
-    const firebaseConfig = {
+    const app = initializeApp({
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
       authDomain: "poll-e8e49.firebaseapp.com",
       databaseURL: "https://poll-e8e49-default-rtdb.firebaseio.com",
@@ -17,72 +26,50 @@
       storageBucket: "poll-e8e49.appspot.com",
       messagingSenderId: "957719245646",
       appId: "1:957719245646:web:490403f5587901efcde41f"
-    };
+    });
 
-    const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    onDisconnect(userRef).remove();
 
+    const questionSection = document.getElementById("question-section");
+    const waitingDiv = document.getElementById("waiting");
     const questionText = document.getElementById("question-text");
     const optionsDiv = document.getElementById("options");
 
-    let currentQuestion = null;
-    let answered = false;
+    // Registrar usuario anónimo
+    const connRef = ref(db, "connections");
+    runTransaction(connRef, (current) => (current || 0) + 1);
 
-    function renderQuestion(data) {
-      const { question, options } = data;
-      questionText.textContent = question;
+    // Mostrar pregunta actual si host inició
+    const currentRef = ref(db, "currentQuestion");
+    onValue(currentRef, (snap) => {
+      const val = snap.val();
+      if (!val || !val.question || !val.options) return;
+
+      waitingDiv.style.display = "none";
+      questionSection.style.display = "block";
+
+      questionText.textContent = val.question;
       optionsDiv.innerHTML = "";
-
-      options.forEach(opt => {
-        const container = document.createElement("div");
-        container.className = "option-container";
-
+      val.options.forEach((opt) => {
         const div = document.createElement("div");
         div.className = "option";
         div.textContent = opt;
-
-        div.addEventListener("click", () => {
-          if (answered) return;
-          answered = true;
-          vote(opt);
-          div.classList.add("disabled");
-        });
-
-        container.appendChild(div);
-        optionsDiv.appendChild(container);
+        div.onclick = () => vote(opt);
+        optionsDiv.appendChild(div);
       });
-    }
+    });
 
     function vote(option) {
-      const voteRef = ref(db, `votes/${currentQuestion}/${option}`);
-      runTransaction(voteRef, current => (current || 0) + 1);
-    }
-
-    // Escuchar inicio de encuesta
-    const stateRef = ref(db, "state");
-    onValue(stateRef, (snapshot) => {
-      const state = snapshot.val();
-      if (state && state.started && state.currentQuestion) {
-        currentQuestion = state.currentQuestion;
-        answered = false;
-
-        const questionRef = ref(db, `questions/${currentQuestion}`);
-        onValue(questionRef, (snap) => {
-          const qData = snap.val();
-          if (qData) renderQuestion(qData);
+      const voteRef = ref(db, `votes/${option}`);
+      runTransaction(voteRef, (val) => (val || 0) + 1).then(() => {
+        document.querySelectorAll(".option").forEach(opt => {
+          opt.classList.add("disabled");
+          if (opt.textContent === option) {
+            opt.style.backgroundColor = "#a5f3fc";
+          }
         });
-      } else {
-        questionText.textContent = "Esperando que el host inicie la encuesta...";
-        optionsDiv.innerHTML = "";
-      }
-    });
+      });
+    }
   </script>
-</head>
-  
-<body>
-  <h1>¡Bienvenido a la encuesta!</h1>
-  <div id="question-text">Cargando pregunta...</div>
-  <div id="options"></div>
 </body>
 </html>
