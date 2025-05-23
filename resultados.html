@@ -18,10 +18,17 @@
       font-size: 24px;
       margin: 20px 0;
     }
-    canvas {
-      max-width: 600px;
-      margin: 20px auto;
-    }
+    #chart-container {
+    width: 90%;
+    max-width: 800px;
+    height: 500px;
+    margin: 0 auto;
+  }
+
+  canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
     .nav-buttons {
       margin-top: 30px;
     }
@@ -44,7 +51,9 @@
 <body>
   <h1>Resultados de la Encuesta</h1>
   <div id="question">Cargando pregunta...</div>
+  <div id="chart-container">
   <canvas id="chart"></canvas>
+  </div>
   <div class="nav-buttons">
     <button id="prev">Anterior</button>
     <button id="next">Siguiente</button>
