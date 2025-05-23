@@ -67,13 +67,6 @@
       },
     ];
 
-    // Actualizar cantidad de conectados
-    const connectedCountElem = document.getElementById("connected-count");
-    onValue(connectionsRef, (snap) => {
-      const count = snap.size || 0;
-      connectedCountElem.textContent = `Conectados: ${count}`;
-    });
-
     // Elementos de UI
     const waitingRoom = document.getElementById("waiting-room");
     const questionSection = document.getElementById("question-section");
