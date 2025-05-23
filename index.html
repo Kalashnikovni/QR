@@ -75,23 +75,23 @@
     // 7) Ahora que existe un estado, enganchamos el listener
     // Después de definir hostRef y las variables UI:
     let initialized = false;
-    onValue(hostRef, snap => {
-      if (!initialized) {
-        initialized = true;
-        return;
-      }
-      const data = snap.val();
-      if (data && data.active === true && typeof data.questionIndex === "number") {
-        if (data.questionIndex !== lastIdx) {
-          lastIdx = data.questionIndex;
-          startQuestion(data.questionIndex);
-        }
-      } else {
-        // Sala de espera
-        waitingDiv.style.display = '';
-        qSection.style.display   = 'none';
-      }
-    });
+    const hostRef = ref(db, "host");
+let lastIdx = null;
+
+onValue(hostRef, snap => {
+  const data = snap.val();
+  if (data && data.active === true && typeof data.questionIndex === "number") {
+    // La encuesta se inició o avanza
+    if (data.questionIndex !== lastIdx) {
+      lastIdx = data.questionIndex;
+      startQuestion(lastIdx);
+    }
+  } else {
+    // Sala de espera
+    waitingDiv.style.display = "";
+    qSection.style.display   = "none";
+  }
+});
   })();
 
   // 8) Función para arrancar la pregunta + countdown
