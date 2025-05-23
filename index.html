@@ -73,22 +73,23 @@
     }
 
     // 7) Ahora que existe un estado, enganchamos el listener
+    // Después de definir hostRef y las variables UI:
     let initialized = false;
     onValue(hostRef, snap => {
       if (!initialized) {
-      // Ignoramos el primer callback con el estado actual (a veces viejo)
-      initialized = true;
-      return;
-    }
-    const data = snap.val();
-    if (data && data.active === true && typeof data.questionIndex === "number") {
-      if (data.questionIndex !== lastIdx) {
-        lastIdx = data.questionIndex;
-        startQuestion(data.questionIndex);
+        initialized = true;
+        return;
+      }
+      const data = snap.val();
+      if (data && data.active === true && typeof data.questionIndex === "number") {
+        if (data.questionIndex !== lastIdx) {
+          lastIdx = data.questionIndex;
+          startQuestion(data.questionIndex);
+        }
       } else {
         // Sala de espera
-        waitingDiv.style.display = "";
-        qSection.style.display   = "none";
+        waitingDiv.style.display = '';
+        qSection.style.display   = 'none';
       }
     });
   })();
