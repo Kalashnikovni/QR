@@ -1,223 +1,136 @@
 <!DOCTYPE html>
 <html lang="es">
 <meta charset="UTF-8" />
-  <title>Encuesta Interactiva</title>
+  <title>Encuesta</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="index_style.css">
+
   <style>
-    body {
-      margin: 0;
-      font-family: 'Poppins', sans-serif;
-      animation: gradient 15s ease infinite;
-      background: linear-gradient(-45deg, #a8edea, #7ed6df, #70c1b3, #3fada8);
-      background-size: 400% 400%;
-      text-align: center;
-      padding: 30px;
-      color: #333;
+    #pregunta, #opciones, #espera {
+      margin-top: 2em;
     }
 
-    @keyframes gradient {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-
-    h1 {
-      font-size: 48px;
-      font-weight: 800;
-      color: #ffffff;
-      text-shadow: 2px 2px 6px rgba(0,0,0,0.2);
-      margin-bottom: 10px;
-      letter-spacing: 1px;
-      transition: all 0.3s ease;
-    }
-
-    #question-text {
-      font-size: 28px;
-      font-weight: 600;
-      color: #f0fdfd;
-      text-shadow: 1px 1px 4px rgba(0,0,0,0.2);
-      margin: 20px 0;
-      transition: all 0.3s ease;
-    }
-
-    .option-container {
-      margin: 15px auto;
-      width: 95%;
-      max-width: 600px;
-      background: #ffffff;
-      border-radius: 16px;
-      box-shadow: 0 6px 12px rgba(0,0,0,0.1);
-      overflow: hidden;
+    .opcion {
+      background: white;
+      color: black;
+      padding: 1em;
+      margin: 0.5em auto;
+      width: 80%;
+      max-width: 300px;
+      border-radius: 10px;
+      font-weight: bold;
+      cursor: pointer;
       transition: transform 0.2s;
     }
 
-    .option-container:hover {
-      transform: scale(1.02);
+    .opcion:hover {
+      transform: scale(1.05);
+      background-color: #a5f3fc;
     }
 
-    .option {
-  cursor: pointer;
-  font-size: 20px;
-  font-weight: 600;
-  color: #00796b;             /* Verde azulado, para buena lectura */
-  padding: 18px 25px;         /* Más espacio para que sea cómodo */
-  border-bottom: 1px solid #ddd;
-  background-color: #e0f2f1;  /* Fondo suave, muy sutil */
-  border-radius: 12px;        /* Bordes redondeados */
-  box-shadow: 0 2px 5px rgba(0, 121, 107, 0.15);
-  transition: background-color 0.3s ease, box-shadow 0.3s ease;
-  user-select: none;          /* Evita seleccionar texto accidental */
-}
-
-    .option:last-child {
-      border-bottom: none;
-    }
-
-    .option:hover {
-  background-color: #b2dfdb;  /* Cambio suave al pasar el mouse */
-  box-shadow: 0 6px 15px rgba(0, 121, 107, 0.3);
-  color: #004d40;             /* Más oscuro al hover */
-}
-
-.disabled {
-  background-color: #a7c7c5;
-  color: #4a6463;
-  box-shadow: none;
-  cursor: default;
-}
-
-    .progress-bar {
-      display: none;
-    }
-
-    #next-btn {
-      margin-top: 40px;
-      padding: 20px;
-      font-size: 20px;
-      font-weight: bold;
-      background-color: #4db6ac;
-      color: white;
-      border: none;
-      border-radius: 12px;
-      width: 90%;
-      max-width: 500px;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-
-    #next-btn:hover {
-      background-color: #00897b;
+    .opcion.votada {
+      background-color: #a5f3fc;
     }
   </style>
 </head>
 <body>
-  <h1>Encuesta Interactiva</h1>
-  <div id="question-text">Cargando pregunta...</div>
-  <div id="options"></div>
-  <button id="next-btn">Siguiente pregunta</button>
-  <div id="qr-code"></div>
+  <h1>¡Bienvenidos!</h1>
+  <div id="espera">Esperando que comience la encuesta...</div>
+  <div id="pregunta" style="display:none;"></div>
+  <div id="opciones"></div>
 
+  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-    import { getDatabase, ref, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
-    
-    // Tu configuración Firebase
+    import { getDatabase, ref, onValue, runTransaction, increment } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+
     const firebaseConfig = {
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
       authDomain: "poll-e8e49.firebaseapp.com",
       databaseURL: "https://poll-e8e49-default-rtdb.firebaseio.com",
       projectId: "poll-e8e49",
-      storageBucket: "poll-e8e49.firebasestorage.app",
+      storageBucket: "poll-e8e49.appspot.com",
       messagingSenderId: "957719245646",
       appId: "1:957719245646:web:490403f5587901efcde41f"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    const questions = [
-      {
-        question: "¿Cuál es tu color favorito?",
-        options: ["Rojo", "Azul", "Verde", "Amarillo"],
-      },
-      {
-        question: "¿Cuál es tu animal favorito?",
-        options: ["Perro", "Gato", "Pez", "Pájaro"],
-      },
-      {
-        question: "¿Cuál es tu estación favorita?",
-        options: ["Verano", "Invierno", "Otoño", "Primavera"],
-      },
-    ];
+    const salaRef = ref(db, "sala1");
 
-    let current = 0;
-    const questionText = document.getElementById("question-text");
-    const optionsDiv = document.getElementById("options");
-    const nextBtn = document.getElementById("next-btn");
+    let preguntaActual = null;
+    let yaVote = false;
 
-    function showQuestion() {
-      const q = questions[current];
-      questionText.textContent = q.question;
-      optionsDiv.innerHTML = "";
+    // Incrementar cantidad de conectados
+    const conectadosRef = ref(db, "sala1/conectados");
+    runTransaction(conectadosRef, (n) => (n || 0) + 1);
 
-      q.options.forEach((opt) => {
-        const div = document.createElement("div");
-        div.className = "option";
-        div.textContent = opt;
+    // Escuchar estado de la encuesta
+    onValue(salaRef, (snapshot) => {
+      const data = snapshot.val();
+      if (!data) return;
 
-        const progress = document.createElement("div");
-        progress.className = "progress-bar";
-        progress.style.width = "0%";
-
-        const container = document.createElement("div");
-        container.className = "option-container";
-        container.appendChild(div);
-        container.appendChild(progress);
-
-        div.addEventListener("click", () => vote(opt));
-
-        optionsDiv.appendChild(container);
-      });
-
-      nextBtn.style.display = "none";
-    }
-
-    function vote(option) {
-      const qKey = `q${current}`;
-      const voteRef = ref(db, `votes/${qKey}/${option}`);
-
-      runTransaction(voteRef, (currentValue) => {
-        return (currentValue || 0) + 1;
-      }).then(() => {
-        document.querySelectorAll(".option").forEach((el) => {
-          el.classList.add("disabled");
-          if (el.textContent === option) {
-            el.style.backgroundColor = "#b2ebf2";
-          }
-        });
-        nextBtn.style.display = current < questions.length - 1 ? "inline-block" : "none";
-      });
-    }
-
-    function updateVotesDisplay(votes) {
-      
-    }
-
-    // Listener para los votos en Firebase
-    const votesRef = ref(db, "votes");
-    onValue(votesRef, (snapshot) => {
-      const votes = snapshot.val();
-      updateVotesDisplay(votes);
-    });
-
-
-    nextBtn.addEventListener("click", () => {
-      current++;
-      if (current < questions.length) {
-        showQuestion();
+      if (data.estado === "esperando") {
+        document.getElementById("espera").style.display = "block";
+        document.getElementById("pregunta").style.display = "none";
+        document.getElementById("opciones").innerHTML = "";
+        yaVote = false;
+      } else if (data.estado === "activa") {
+        preguntaActual = data.preguntaActual || 0;
+        mostrarPregunta(preguntaActual);
       }
     });
 
-    showQuestion();
+    // Preguntas
+    const preguntas = [
+      {
+        texto: "¿Cuál es tu color favorito?",
+        opciones: ["Rojo", "Azul", "Verde", "Amarillo"]
+      },
+      {
+        texto: "¿Cuál es tu animal favorito?",
+        opciones: ["Perro", "Gato", "Pez", "Pájaro"]
+      },
+      {
+        texto: "¿Cuál es tu estación favorita?",
+        opciones: ["Verano", "Invierno", "Otoño", "Primavera"]
+      }
+    ];
+
+    function mostrarPregunta(index) {
+      yaVote = false;
+      const p = preguntas[index];
+      if (!p) return;
+
+      document.getElementById("espera").style.display = "none";
+      document.getElementById("pregunta").textContent = p.texto;
+      document.getElementById("pregunta").style.display = "block";
+
+      const opcionesDiv = document.getElementById("opciones");
+      opcionesDiv.innerHTML = "";
+
+      p.opciones.forEach(opcion => {
+        const div = document.createElement("div");
+        div.textContent = opcion;
+        div.className = "opcion";
+        div.onclick = () => votar(opcion);
+        opcionesDiv.appendChild(div);
+      });
+    }
+
+    function votar(opcion) {
+      if (yaVote || preguntaActual === null) return;
+
+      yaVote = true;
+      const ruta = `sala1/votos/q${preguntaActual}/${opcion}`;
+      const votoRef = ref(db, ruta);
+      runTransaction(votoRef, (n) => (n || 0) + 1);
+
+      document.querySelectorAll(".opcion").forEach(el => {
+        el.classList.add("votada");
+        el.onclick = null;
+      });
+    }
   </script>
 </body>
 </html>
