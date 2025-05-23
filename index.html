@@ -21,10 +21,11 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import {
       getDatabase, ref, onValue,
-      push, onDisconnect, runTransaction
+      push, onDisconnect, set,
+      runTransaction
     } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
-    // 1) Configura tu Firebase aquí:
+    // 1) Tu configuración Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
       authDomain: "poll-e8e49.firebaseapp.com",
@@ -37,25 +38,23 @@
     const app = initializeApp(firebaseConfig);
     const db  = getDatabase(app);
 
-    // 2) Presencia
+    // 2) Presencia de usuario
     const connectionsRef = ref(db, "connections");
-    const myConn = push(connectionsRef);
-    setTimeout(() => { // set timeout small to avoid race
-      runTransaction(myConn, () => true);
-      onDisconnect(myConn).remove();
-    }, 0);
+    const myConnRef = push(connectionsRef);
+    set(myConnRef, true);
+    onDisconnect(myConnRef).remove();
 
-    // 3) Lectura del control del host
+    // 3) Control del host
     const hostRef = ref(db, "host");
 
-    // 4) Preguntas
+    // 4) Definición de preguntas
     const preguntas = [
       { text: "¿Cuál es tu color favorito?",   options: ["Rojo","Azul","Verde","Amarillo"] },
       { text: "¿Cuál es tu animal favorito?",  options: ["Perro","Gato","Pez","Pájaro"] },
       { text: "¿Qué estación prefieres?",      options: ["Verano","Invierno","Otoño","Primavera"] }
     ];
 
-    // 5) UI
+    // 5) Elementos UI
     const waitingDiv  = document.getElementById("waiting");
     const qSection    = document.getElementById("question-section");
     const qText       = document.getElementById("question-text");
@@ -64,11 +63,10 @@
 
     let lastIdx = null, timerHandle = null;
 
-    // 6) Al cargar, asegúrate de que hostRef esté en estado inicial
-    // Solo si no existe, ponlo en inactive
+    // 6) Asegurar estado inicial en hostRef
     onValue(hostRef, snap => {
       if (snap.val() === null) {
-        hostRef && runTransaction(hostRef, () => ({ active: false, questionIndex: null }));
+        set(hostRef, { active: false, questionIndex: null });
       }
     }, { onlyOnce: true });
 
@@ -81,19 +79,18 @@
           startQuestion(data.questionIndex);
         }
       } else {
-        // sala de espera
+        // Sala de espera
         waitingDiv.style.display = "";
         qSection.style.display   = "none";
       }
     });
 
-    // 8) Función para mostrar pregunta + countdown
+    // 8) Mostrar pregunta y countdown
     function startQuestion(idx) {
       waitingDiv.style.display = "none";
       qSection.style.display   = "";
-      cdDiv.textContent        = "";
 
-      // render pregunta y opciones
+      // Renderizar pregunta
       const p = preguntas[idx];
       qText.textContent = p.text;
       optsDiv.innerHTML = "";
@@ -104,7 +101,7 @@
         optsDiv.appendChild(btn);
       });
 
-      // 15s countdown
+      // Iniciar cuenta regresiva de 15s
       let t = 15;
       cdDiv.textContent = `Tiempo restante: ${t}s`;
       if (timerHandle) clearInterval(timerHandle);
@@ -119,7 +116,7 @@
       }, 1000);
     }
 
-    // 9) Función para votar con transacción
+    // 9) Enviar voto con transacción
     function submitVote(idx, option) {
       const voteRef = ref(db, `votes/q${idx}/${option}`);
       runTransaction(voteRef, (current = 0) => current + 1)
