@@ -5,11 +5,21 @@
   <title>Resultados de la Encuesta</title>
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(to right, #fdfbfb, #ebedee);
-      text-align: center;
-      padding: 30px;
-    }
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  animation: gradient 15s ease infinite;
+  background: linear-gradient(-45deg, #ff9a9e, #fad0c4, #fbc2eb, #a18cd1);
+  background-size: 400% 400%;
+  text-align: center;
+  padding: 30px;
+  color: #333;
+}
+
+@keyframes gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
     h1 {
       color: #333;
       font-size: 32px;
