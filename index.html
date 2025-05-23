@@ -7,10 +7,13 @@
 </head>
 <body>
   <h1>Encuesta Anónima</h1>
+
+  <!-- Sala de espera genérica -->
   <div id="waiting">
-    <p>Esperando a que el host inicie la encuesta…</p>
+    <p id="waiting-text">Esperando a que el host inicie la encuesta…</p>
   </div>
 
+  <!-- Sección de pregunta + opciones -->
   <div id="question-section" style="display:none;">
     <h2 id="question-text"></h2>
     <div id="options"></div>
@@ -18,116 +21,126 @@
   </div>
 
   <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-  import {
-    getDatabase, ref, onValue,
-    push, onDisconnect, set, runTransaction
-  } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import {
+      getDatabase, ref, onValue,
+      push, onDisconnect, runTransaction, set
+    } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
-  // 1) Inicializa Firebase
-  const firebaseConfig = {
-    apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
-    authDomain: "poll-e8e49.firebaseapp.com",
-    databaseURL: "https://poll-e8e49-default-rtdb.firebaseio.com",
-    projectId: "poll-e8e49",
-    storageBucket: "poll-e8e49.firebasestorage.app",
-    messagingSenderId: "957719245646",
-    appId: "1:957719245646:web:490403f5587901efcde41f",
-  };
-  const app = initializeApp(firebaseConfig);
-  const db  = getDatabase(app);
+    // 1) Inicializa Firebase
+    const firebaseConfig = {
+      apiKey: "TU_API_KEY",
+      authDomain: "TU_AUTH_DOMAIN",
+      databaseURL: "https://TU_BASE-default-rtdb.firebaseio.com",
+      projectId: "TU_PROJECT_ID",
+      storageBucket: "TU_BUCKET",
+      messagingSenderId: "TU_SENDER",
+      appId: "TU_APPID"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db  = getDatabase(app);
 
-  // 2) Presencia de usuario
-  const connectionsRef = ref(db, "connections");
-  const myConnRef = push(connectionsRef);
-  set(myConnRef, true);
-  onDisconnect(myConnRef).remove();
+    // 2) Presencia de usuario
+    const connectionsRef = ref(db, "connections");
+    const myConnRef = push(connectionsRef);
+    set(myConnRef, true);
+    onDisconnect(myConnRef).remove();
 
-  // 3) Referencia de control host
-  const hostRef = ref(db, "host");
-
-  // 4) Preguntas
-  const preguntas = [
-    { text: "¿Cuál es tu color favorito?",   options: ["Rojo","Azul","Verde","Amarillo"] },
-    { text: "¿Cuál es tu animal favorito?",  options: ["Perro","Gato","Pez","Pájaro"] },
-    { text: "¿Qué estación prefieres?",      options: ["Verano","Invierno","Otoño","Primavera"] }
-  ];
-
-  // 5) UI
-  const waitingDiv  = document.getElementById("waiting");
-  const qSection    = document.getElementById("question-section");
-  const qText       = document.getElementById("question-text");
-  const optsDiv     = document.getElementById("options");
-  const cdDiv       = document.getElementById("countdown");
-
-  let lastIdx = null, timerHandle = null;
-
-  // 6) Forzar estado inicial en hostRef **antes** del listener**
-  (async () => {
-    const snap = await import("https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js")
-      .then(m=>m.get(ref(db,"host")) )
-      .catch(()=>null);
-    if (snap === null || snap.val() === null) {
-      // Setea explicitamente inactivo
-      set(hostRef, { active: false, questionIndex: null });
-    }
-
-    // 7) Ahora que existe un estado, enganchamos el listener
-    // Después de definir hostRef y las variables UI:
-    let initialized = false;
+    // 3) Referencia de control del host
     const hostRef = ref(db, "host");
-let lastIdx = null;
 
-onValue(hostRef, snap => {
-  const data = snap.val();
-  if (data && data.active === true && typeof data.questionIndex === "number") {
-    // La encuesta se inició o avanza
-    if (data.questionIndex !== lastIdx) {
-      lastIdx = data.questionIndex;
-      startQuestion(lastIdx);
-    }
-  } else {
-    // Sala de espera
-    waitingDiv.style.display = "";
-    qSection.style.display   = "none";
-  }
-});
-  })();
+    // 4) Define tus preguntas
+    const preguntas = [
+      { text: "¿Cuál es tu color favorito?",   options: ["Rojo","Azul","Verde","Amarillo"] },
+      { text: "¿Cuál es tu animal favorito?",  options: ["Perro","Gato","Pez","Pájaro"] },
+      { text: "¿Qué estación prefieres?",      options: ["Verano","Invierno","Otoño","Primavera"] }
+    ];
 
-  // 8) Función para arrancar la pregunta + countdown
-  function startQuestion(idx) {
-    waitingDiv.style.display = "none";
-    qSection.style.display   = "";
+    // 5) Elementos de UI
+    const waitingDiv   = document.getElementById("waiting");
+    const waitingText  = document.getElementById("waiting-text");
+    const qSection     = document.getElementById("question-section");
+    const qText        = document.getElementById("question-text");
+    const optsDiv      = document.getElementById("options");
+    const cdDiv        = document.getElementById("countdown");
 
-    // Renderiza pregunta y opciones
-    const p = preguntas[idx];
-    qText.textContent = p.text;
-    optsDiv.innerHTML = "";
-    p.options.forEach(opt => {
-      const btn = document.createElement("button");
-      btn.textContent = opt;
-      btn.onclick = () => {
-        const voteRef = ref(db, `votes/q${idx}/${opt}`);
-        runTransaction(voteRef, (c=0)=>c+1);
-        Array.from(optsDiv.children).forEach(b=>b.disabled=true);
-      };
-      optsDiv.appendChild(btn);
+    let lastIdx = null;
+    let timerHandle = null;
+    let initial = true;
+
+    // 6) Aseguramos estado inicial (si no existe, lo seteamos inactivo)
+    onValue(hostRef, snap => {
+      if (snap.val() === null) {
+        set(hostRef, { active: false, questionIndex: null });
+      }
+    }, { onlyOnce: true });
+
+    // 7) Listener principal del estado host
+    onValue(hostRef, snap => {
+      const data = snap.val() || {};
+
+      // Primera notificación: decidimos si la encuesta ya estaba en curso
+      if (initial) {
+        initial = false;
+        if (data.active === true) {
+          // Llegó luego de arrancada
+          waitingText.textContent = "La encuesta ya está en curso. Por favor, espera la próxima ronda.";
+          waitingDiv.style.display = "";
+          qSection.style.display   = "none";
+          return;
+        }
+        // Si data.active === false, seguimos a sala de espera normal
+      }
+
+      // Si el host acabó de iniciar o avanzar la encuesta
+      if (data.active === true && typeof data.questionIndex === "number") {
+        const idx = data.questionIndex;
+        if (idx !== lastIdx) {
+          lastIdx = idx;
+          startQuestion(idx);
+        }
+      } else {
+        // Sala de espera antes de iniciar
+        waitingText.textContent = "Esperando a que el host inicie la encuesta…";
+        waitingDiv.style.display = "";
+        qSection.style.display   = "none";
+      }
     });
 
-    // Countdown 15s
-    let t = 15;
-    cdDiv.textContent = `Tiempo restante: ${t}s`;
-    if (timerHandle) clearInterval(timerHandle);
-    timerHandle = setInterval(() => {
-      t--;
+    // 8) Función para mostrar pregunta + cuenta regresiva
+    function startQuestion(idx) {
+      waitingDiv.style.display = "none";
+      qSection.style.display   = "";
+
+      // Renderiza texto y opciones
+      const p = preguntas[idx];
+      qText.textContent = p.text;
+      optsDiv.innerHTML = "";
+      p.options.forEach(opt => {
+        const btn = document.createElement("button");
+        btn.textContent = opt;
+        btn.onclick = () => {
+          const voteRef = ref(db, `votes/q${idx}/${opt}`);
+          runTransaction(voteRef, (cur = 0) => cur + 1);
+          Array.from(optsDiv.children).forEach(b => b.disabled = true);
+        };
+        optsDiv.appendChild(btn);
+      });
+
+      // Inicia 15s de countdown
+      let t = 15;
       cdDiv.textContent = `Tiempo restante: ${t}s`;
-      if (t <= 0) {
-        clearInterval(timerHandle);
-        Array.from(optsDiv.children).forEach(b=>b.disabled=true);
-        cdDiv.textContent = "Esperando siguiente pregunta…";
-      }
-    }, 1000);
-  }
-</script>
+      if (timerHandle) clearInterval(timerHandle);
+      timerHandle = setInterval(() => {
+        t--;
+        cdDiv.textContent = `Tiempo restante: ${t}s`;
+        if (t <= 0) {
+          clearInterval(timerHandle);
+          Array.from(optsDiv.children).forEach(b => b.disabled = true);
+          cdDiv.textContent = "Esperando siguiente pregunta…";
+        }
+      }, 1000);
+    }
+  </script>
 </body>
 </html>
