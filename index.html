@@ -21,7 +21,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import {
       getDatabase, ref, onValue,
-      push, onDisconnect, set
+      push, onDisconnect, set, runTransaction
     } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
     // 1) Inicializa Firebase (reemplaza con tu config)
@@ -114,12 +114,14 @@
 
     // 8) Enviar voto
     function submitVote(idx, option) {
-      // guardamos la opción como valor en un push bajo votes/q{idx}
-      const vr = ref(db, `votes/q${idx}`);
-      const vpush = push(vr);
-      vpush.set(option);
-      // desactivar inmediatamente
-      Array.from(optsDiv.children).forEach(b => b.disabled = true);
+      // Ruta: votes/q{idx}/{option}
+      const voteRef = ref(db, `votes/q${idx}/${option}`);
+      runTransaction(voteRef, (current = 0) => current + 1)
+        .then(() => {
+        // Deshabilitar botones tras votar
+        Array.from(optsDiv.children).forEach(b => b.disabled = true);
+      })
+      .catch(console.error);
     }
   </script>
 </body>
