@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Encuesta – Participantes</title>
 </head>
 <body>
@@ -20,10 +20,11 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import {
-      getDatabase, ref, onValue, push, onDisconnect
+      getDatabase, ref, onValue,
+      push, onDisconnect
     } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
-    // === Config Firebase ===
+    // 1) Inicializa Firebase (reemplaza con tu config)
     const firebaseConfig = {
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
       authDomain: "poll-e8e49.firebaseapp.com",
@@ -36,49 +37,55 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // === Sala de espera / presencia ===
+    // 2) Sistema de presencia
     const connectionsRef = ref(db, "connections");
     const myConn = push(connectionsRef);
     myConn.set(true);
     onDisconnect(myConn).remove();
 
-    // === Preguntas ===
+    // 3) Datos compartidos
+    const hostRef = ref(db, "host");
+
+    // 4) Preguntas
     const preguntas = [
-      { text: "¿Cuál es tu color favorito?", options: ["Rojo", "Azul", "Verde", "Amarillo"] },
-      { text: "¿Cuál es tu animal favorito?", options: ["Perro", "Gato", "Pez", "Pájaro"] },
-      { text: "¿Qué estación prefieres?", options: ["Verano", "Invierno", "Otoño", "Primavera"] }
+      { text: "¿Cuál es tu color favorito?",   options: ["Rojo","Azul","Verde","Amarillo"] },
+      { text: "¿Cuál es tu animal favorito?",  options: ["Perro","Gato","Pez","Pájaro"] },
+      { text: "¿Qué estación prefieres?",      options: ["Verano","Invierno","Otoño","Primavera"] }
     ];
 
-    // Elementos UI
-    const waitingDiv = document.getElementById("waiting");
-    const qSection = document.getElementById("question-section");
-    const qText = document.getElementById("question-text");
-    const optsDiv = document.getElementById("options");
-    const countdownDiv = document.getElementById("countdown");
+    // 5) UI
+    const waitingDiv  = document.getElementById("waiting");
+    const qSection    = document.getElementById("question-section");
+    const qText       = document.getElementById("question-text");
+    const optsDiv     = document.getElementById("options");
+    const countdownEl = document.getElementById("countdown");
 
-    let lastQuestion = null;
+    let lastIndex = null;
     let timerHandle = null;
 
-    // Escucha control del host
-    const hostRef = ref(db, "host");
+    // 6) Escucha instrucciones del host
     onValue(hostRef, snap => {
       const data = snap.val();
-      if (data && data.active === true && typeof data.questionIndex === "number") {
+      if (data && data.active && typeof data.questionIndex === "number") {
         const idx = data.questionIndex;
-        if (idx !== lastQuestion) {
-          lastQuestion = idx;
+        if (idx !== lastIndex) {
+          lastIndex = idx;
           startQuestion(idx);
         }
+      } else {
+        // sala de espera
+        waitingDiv.style.display = "";
+        qSection.style.display = "none";
       }
     });
 
+    // 7) Mostrar pregunta y countdown
     function startQuestion(idx) {
-      // mostrar UI
       waitingDiv.style.display = "none";
-      qSection.style.display = "block";
-      countdownDiv.textContent = "";
+      qSection.style.display = "";
+      countdownEl.textContent = "";
 
-      // render pregunta y opciones
+      // render pregunta
       const p = preguntas[idx];
       qText.textContent = p.text;
       optsDiv.innerHTML = "";
@@ -89,28 +96,31 @@
         optsDiv.appendChild(btn);
       });
 
-      // iniciar cuenta regresiva 15s
+      // countdown 15s
       let t = 15;
-      countdownDiv.textContent = `Tiempo restante: ${t}s`;
+      countdownEl.textContent = `Tiempo restante: ${t}s`;
       if (timerHandle) clearInterval(timerHandle);
       timerHandle = setInterval(() => {
         t--;
-        countdownDiv.textContent = `Tiempo restante: ${t}s`;
+        countdownEl.textContent = `Tiempo restante: ${t}s`;
         if (t <= 0) {
           clearInterval(timerHandle);
-          // al terminar, deshabilitar opciones
+          // desactivar botones
           Array.from(optsDiv.children).forEach(b => b.disabled = true);
-          countdownDiv.textContent = "Esperando siguiente pregunta...";
+          countdownEl.textContent = "Esperando siguiente pregunta…";
         }
       }, 1000);
     }
 
+    // 8) Enviar voto
     function submitVote(idx, option) {
-      // push a /votes/{idx}/{option}
-      const voteRef = ref(db, `votes/q${idx}/${option}`);
-      push(voteRef).set(true);
+      // guardamos la opción como valor en un push bajo votes/q{idx}
+      const vr = ref(db, `votes/q${idx}`);
+      const vpush = push(vr);
+      vpush.set(option);
+      // desactivar inmediatamente
+      Array.from(optsDiv.children).forEach(b => b.disabled = true);
     }
   </script>
 </body>
 </html>
-
