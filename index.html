@@ -40,7 +40,7 @@
     // 2) Sistema de presencia
     const connectionsRef = ref(db, "connections");
     const myConn = push(connectionsRef);
-    myConn.set(true);
+    set(myConn, true);
     onDisconnect(myConn).remove();
 
     // 3) Datos compartidos
