@@ -9,12 +9,17 @@
 <body>
   <h1>Panel del Host</h1>
   <div id="connected-count">Conectados: 0</div>
+
   <button id="start-btn">Iniciar Encuesta</button>
-  <div id="countdown" style="font-size:2em; margin:20px 0;"></div>
+
+  <div id="countdown"></div>
+
   <h2 id="question-text"></h2>
-  <div id="chart-container">
-  <canvas id="chart" style="max-width:90%; display:none;"></canvas>
+
+  <div id="chart-container" style="display:none;">
+    <canvas id="chart"></canvas>
   </div>
+
   <button id="next-question" style="display:none;">Siguiente Pregunta</button>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
