@@ -5,60 +5,102 @@
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(to right, #fdfbfb, #ebedee);
+      margin: 0;
+      background: linear-gradient(-45deg, #f9f9f9, #e1f5fe, #fff3e0, #fce4ec);
+      background-size: 400% 400%;
+      animation: gradient 15s ease infinite;
       text-align: center;
       padding: 30px;
     }
+
+    @keyframes gradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
     h1 {
       color: #333;
+      margin-bottom: 30px;
+      font-size: 32px;
     }
+
     #question-text {
       font-size: 24px;
-      margin-bottom: 20px;
+      margin-bottom: 30px;
+      color: #444;
     }
+
     .option-container {
-      margin: 10px auto;
-      width: 80%;
-      max-width: 500px;
+      margin: 15px auto;
+      width: 95%;
+      max-width: 600px;
       background: #ffffff;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      padding: 10px;
+      border-radius: 16px;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+      overflow: hidden;
+      transition: transform 0.2s;
     }
+
+    .option-container:hover {
+      transform: scale(1.02);
+    }
+
     .option {
       cursor: pointer;
-      font-size: 18px;
-      padding: 10px;
-      border-radius: 8px;
-      transition: background 0.3s;
+      font-size: 20px;
+      padding: 20px;
+      border-bottom: 1px solid #eee;
+      background-color: #fff;
     }
+
+    .option:last-child {
+      border-bottom: none;
+    }
+
     .option:hover {
       background-color: #e0f7fa;
     }
+
     .disabled {
       pointer-events: none;
       opacity: 0.6;
     }
+
     .progress-bar {
-      height: 10px;
+      height: 24px;
       background: #4dd0e1;
-      border-radius: 8px;
-      margin-top: 5px;
+      border-radius: 0 0 16px 16px;
+      color: white;
+      font-size: 14px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       transition: width 0.4s;
     }
+
     #next-btn {
-      margin-top: 20px;
-      padding: 10px 20px;
-      font-size: 16px;
+      margin-top: 40px;
+      padding: 20px;
+      font-size: 20px;
+      font-weight: bold;
       background-color: #4db6ac;
       color: white;
       border: none;
-      border-radius: 8px;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 500px;
       cursor: pointer;
-      display: none;
+      transition: background-color 0.3s;
     }
+
+    #next-btn:hover {
+      background-color: #00897b;
+    }
+
     #qr-code {
-      margin-top: 30px;
+      margin-top: 50px;
     }
   </style>
 </head>
