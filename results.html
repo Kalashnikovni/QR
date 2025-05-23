@@ -1,146 +1,138 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8"/>
-  <link rel="stylesheet" href="styles.css">
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Encuesta – Panel Host</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel del Host</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <h1>Panel del Host</h1>
   <div id="connected-count">Conectados: 0</div>
-
   <button id="start-btn">Iniciar Encuesta</button>
-
   <div id="countdown"></div>
-
   <h2 id="question-text"></h2>
 
-  <div id="chart-container" style="display:none;">
+  <div id="chart-container">
     <canvas id="chart"></canvas>
   </div>
 
-  <button id="next-question" style="display:none;">Siguiente Pregunta</button>
+  <button id="next-question" style="display: none;">Siguiente Pregunta</button>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import {
-      getDatabase, ref, onValue,
-      set, push, onDisconnect
+      getDatabase, ref, onValue, set, push, onDisconnect, runTransaction
     } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+    import { Chart, BarElement, CategoryScale, LinearScale } from "https://cdn.jsdelivr.net/npm/chart.js/+esm";
 
-    // 1) Tu configuración Firebase
+    Chart.register(BarElement, CategoryScale, LinearScale);
+
+    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
       authDomain: "poll-e8e49.firebaseapp.com",
       databaseURL: "https://poll-e8e49-default-rtdb.firebaseio.com",
       projectId: "poll-e8e49",
-      storageBucket: "poll-e8e49.firebasestorage.app",
+      storageBucket: "poll-e8e49.appspot.com",
       messagingSenderId: "957719245646",
       appId: "1:957719245646:web:490403f5587901efcde41f",
     };
     const app = initializeApp(firebaseConfig);
     const db  = getDatabase(app);
 
-    // 2) Presencia de host (opcional)
-    const connectionsRef = ref(db, "connections");
-    const myConnRef = push(connectionsRef);
-    set(myConnRef, true);
-    onDisconnect(myConnRef).remove();
+    const hostRef = ref(db, "host");
+    const connRef = ref(db, "connections");
 
-    // 3) Mostrar conectados
-    onValue(connectionsRef, snap => {
-      const data = snap.val() || {};
-      document.getElementById("connected-count")
-        .textContent = `Conectados: ${Object.keys(data).length}`;
-    });
-
-    // 4) Preguntas
     const preguntas = [
-      { text:"¿Cuál es tu color favorito?",   options:["Rojo","Azul","Verde","Amarillo"] },
-      { text:"¿Cuál es tu animal favorito?",  options:["Perro","Gato","Pez","Pájaro"] },
-      { text:"¿Qué estación prefieres?",      options:["Verano","Invierno","Otoño","Primavera"] }
+      { text: "¿Cuál es tu color favorito?",   options: ["Rojo","Azul","Verde","Amarillo"] },
+      { text: "¿Cuál es tu animal favorito?",  options: ["Perro","Gato","Pez","Pájaro"] },
+      { text: "¿Qué estación prefieres?",      options: ["Verano","Invierno","Otoño","Primavera"] }
     ];
 
-    // 5) UI refs
+    const connectedCount = document.getElementById("connected-count");
     const startBtn = document.getElementById("start-btn");
-    const nextBtn  = document.getElementById("next-btn");
-    const cdDiv    = document.getElementById("countdown");
-    const qText    = document.getElementById("question-text");
-    const chartEl  = document.getElementById("chart");
-    let chartInst  = null, current=-1;
+    const nextBtn = document.getElementById("next-question");
+    const countdownDiv = document.getElementById("countdown");
+    const qText = document.getElementById("question-text");
+    const canvas = document.getElementById("chart");
+    let chart = null;
 
-    // 6) Control del host en BD
-    const hostRef = ref(db, "host");
-    // Reseteamos el estado al cargar la página:
-    set(hostRef, { active: false, questionIndex: null });
+    let currentIndex = -1;
+    let countdownTimer = null;
+    let countdown = 15;
 
-    // Inicializa hostRef una sola vez
-    onValue(hostRef, snap => {
-      if (snap.val() == null) {
-        set(hostRef, { active:false, questionIndex:null });
-      }
-    }, { onlyOnce:true });
+    onValue(connRef, snap => {
+      const count = snap.size || Object.keys(snap.val() || {}).length;
+      connectedCount.textContent = `Conectados: ${count}`;
+    });
 
-    // 7) Botones
     startBtn.onclick = () => {
-      current = 0;
-      set(hostRef, { active:true, questionIndex:0 });
-      startBtn.style.display = "none";
-      nextBtn.style.display  = "none";
-      runRound();
+      currentIndex = 0;
+      showQuestion(currentIndex);
     };
+
     nextBtn.onclick = () => {
-      current++;
-      set(hostRef, { active:true, questionIndex:current });
-      nextBtn.style.display = "none";
-      runRound();
+      currentIndex++;
+      if (currentIndex < preguntas.length) {
+        showQuestion(currentIndex);
+      } else {
+        qText.textContent = "Encuesta finalizada";
+        countdownDiv.textContent = "";
+        canvas.style.display = "none";
+        nextBtn.style.display = "none";
+        set(hostRef, { active: false, questionIndex: null });
+      }
     };
 
-    // 8) Lógica de ciclo pregunta→countdown→resultados
-    function runRound() {
-      const p = preguntas[current];
+    function showQuestion(index) {
+      const p = preguntas[index];
       qText.textContent = p.text;
-      cdDiv.textContent = `Tiempo restante: 15s`;
-      chartEl.style.display = "none";
-      if (chartInst) chartInst.destroy();
+      set(hostRef, { active: true, questionIndex: index });
+      startCountdown();
 
-      let t = 15;
-      const iv = setInterval(() => {
-        t--;
-        cdDiv.textContent = `Tiempo restante: ${t}s`;
-        if (t <= 0) {
-          clearInterval(iv);
-          cdDiv.textContent = "";
-          showResults();
+      onValue(ref(db, `votes/q${index}`), snap => {
+        const votes = snap.val() || {};
+        const labels = p.options;
+        const data = labels.map(opt => votes[opt] || 0);
+
+        if (chart) chart.destroy();
+        chart = new Chart(canvas, {
+          type: "bar",
+          data: {
+            labels,
+            datasets: [{
+              label: "Votos",
+              data,
+              backgroundColor: "#1abc9c",
+              borderRadius: 6
+            }]
+          },
+          options: {
+            scales: {
+              y: { beginAtZero: true }
+            }
+          }
+        });
+        canvas.style.display = "block";
+      });
+    }
+
+    function startCountdown() {
+      if (countdownTimer) clearInterval(countdownTimer);
+      countdown = 15;
+      countdownDiv.textContent = `Tiempo restante: ${countdown}s`;
+      nextBtn.style.display = "none";
+
+      countdownTimer = setInterval(() => {
+        countdown--;
+        countdownDiv.textContent = `Tiempo restante: ${countdown}s`;
+        if (countdown <= 0) {
+          clearInterval(countdownTimer);
+          countdownDiv.textContent = "Tiempo terminado";
+          nextBtn.style.display = "inline-block";
         }
       }, 1000);
-    }
-
-    function showResults() {
-      const vr = ref(db, `votes/q${current}`);
-      onValue(vr, snap => {
-        const data = snap.val() || {};
-        const counts = preguntas[current].options.map(opt => data[opt] || 0);
-        drawChart(preguntas[current].options, counts);
-      }, { onlyOnce:true });
-    }
-
-    function drawChart(labels, data) {
-      chartEl.style.display = "";
-      const ctx = chartEl.getContext("2d");
-      chartInst = new Chart(ctx, {
-        type: 'bar',
-        data: { labels, datasets: [{ label:'Votos', data }] },
-        options:{ scales:{ y:{ beginAtZero:true, ticks:{stepSize:1} } } }
-      });
-      if (current + 1 < preguntas.length) {
-        nextBtn.style.display = "";
-      } else {
-        // al final, desactivamos host
-        set(hostRef, { active:false, questionIndex:null });
-      }
     }
   </script>
 </body>
