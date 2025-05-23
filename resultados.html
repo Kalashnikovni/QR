@@ -1,27 +1,26 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Encuesta – Panel Host</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Prueba Conexiones</title>
 </head>
 <body>
-  <h1>Panel del Host</h1>
-  <div id="connected-count">Conectados: 0</div>
-  <button id="start-btn">Iniciar Encuesta</button>
-  <div id="countdown" style="font-size:2em; margin:20px 0;"></div>
-  <h2 id="question-text"></h2>
-  <canvas id="chart" style="max-width:90%;"></canvas>
-  <button id="next-btn" style="display:none;">Siguiente Pregunta</button>
+  <h1>Conexiones Activas</h1>
+  <div id="connected-count">Conectados: …</div>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import {
-      getDatabase, ref, onValue, set, push, onDisconnect
+      getDatabase,
+      ref,
+      push,
+      onDisconnect,
+      set,
+      onValue
     } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
-    // === Config Firebase ===
+    // 1) Inicializa Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
       authDomain: "poll-e8e49.firebaseapp.com",
@@ -31,97 +30,21 @@
       messagingSenderId: "957719245646",
       appId: "1:957719245646:web:490403f5587901efcde41f",
     };
-    const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // === Sistema de presencia ===
+    // 2) Crea un nodo único por esta sesión
     const connectionsRef = ref(db, "connections");
-    const myConn = push(connectionsRef);
-    myConn.set(true);
-    onDisconnect(myConn).remove();
+    const myConnRef = push(connectionsRef);
+    // Importante: ponemos valores y onDisconnect antes de set()
+    onDisconnect(myConnRef).remove();  
+    set(myConnRef, true);
 
-    const connectedCountDiv = document.getElementById("connected-count");
-    onValue(connectionsRef, snap => {
-      connectedCountDiv.textContent = `Conectados: ${snap.numChildren()}`;
+    // 3) Escucha el número de hijos en /connections
+    const countDiv = document.getElementById("connected-count");
+    onValue(connectionsRef, snapshot => {
+      const n = snapshot.numChildren(); 
+      countDiv.textContent = `Conectados: ${n}`;
     });
-
-    // === Preguntas ===
-    const preguntas = [
-      { text: "¿Cuál es tu color favorito?", options: ["Rojo","Azul","Verde","Amarillo"] },
-      { text: "¿Cuál es tu animal favorito?", options: ["Perro","Gato","Pez","Pájaro"] },
-      { text: "¿Qué estación prefieres?", options: ["Verano","Invierno","Otoño","Primavera"] }
-    ];
-
-    // Elementos UI
-    const startBtn = document.getElementById("start-btn");
-    const nextBtn  = document.getElementById("next-btn");
-    const countdownDiv = document.getElementById("countdown");
-    const qText = document.getElementById("question-text");
-    const chartCtx = document.getElementById("chart").getContext("2d");
-
-    let current = -1, chartInstance = null;
-
-    // Control del host en la base
-    const hostRef = ref(db, "host");
-
-    startBtn.onclick = () => {
-      // iniciar con primera pregunta
-      current = 0;
-      set(hostRef, { active: true, questionIndex: current });
-      startBtn.style.display = "none";
-      runRound();
-    };
-
-    nextBtn.onclick = () => {
-      if (current+1 < preguntas.length) {
-        current++;
-        set(hostRef, { active: true, questionIndex: current });
-        nextBtn.style.display = "none";
-        runRound();
-      }
-    };
-
-    function runRound() {
-      // limpiar
-      qText.textContent = preguntas[current].text;
-      countdownDiv.textContent = `Tiempo restante: 15s`;
-      if (chartInstance) { chartInstance.destroy(); }
-      document.getElementById("chart").style.display = "none";
-
-      // countdown
-      let t = 15;
-      const iv = setInterval(() => {
-        t--;
-        countdownDiv.textContent = `Tiempo restante: ${t}s`;
-        if (t <= 0) {
-          clearInterval(iv);
-          countdownDiv.textContent = "";
-          showResults();
-        }
-      }, 1000);
-    }
-
-    function showResults() {
-      // lee votos y dibuja gráfico
-      const voteRef = ref(db, `votes/q${current}`);
-      onValue(voteRef, snap => {
-        const data = snap.val() || {};
-        const counts = preguntas[current].options.map(opt =>
-          Object.values(data).filter(v => v === true && Object.keys(data).includes(opt) && true).length
-        );
-        drawChart(preguntas[current].options, counts);
-      }, { onlyOnce: true });
-    }
-
-    function drawChart(labels, data) {
-      document.getElementById("chart").style.display = "block";
-      chartInstance = new Chart(chartCtx, {
-        type: 'bar',
-        data: { labels, datasets: [{ label: 'Votos', data }] },
-        options: { scales: { y: { beginAtZero: true, precision:0 } } }
-      });
-      if (current+1 < preguntas.length) nextBtn.style.display = "inline-block";
-    }
   </script>
 </body>
 </html>
