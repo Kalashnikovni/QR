@@ -112,16 +112,18 @@
       }, 1000);
     }
 
-    // 8) Enviar voto
     function submitVote(idx, option) {
-      // Ruta: votes/q{idx}/{option}
-      const voteRef = ref(db, `votes/q${idx}/${option}`);
-      runTransaction(voteRef, (current = 0) => current + 1)
+      // Referencia a la ruta votes/q{idx}
+      const vr = ref(db, `votes/q${idx}`);
+      // Creamos un nodo único
+      const vpush = push(vr);
+      // Guardamos el valor con la función set()
+      set(vpush, option)
         .then(() => {
-        // Deshabilitar botones tras votar
-        Array.from(optsDiv.children).forEach(b => b.disabled = true);
-      })
-      .catch(console.error);
+          // Desactivar botones tras enviar
+          Array.from(optsDiv.children).forEach(btn => btn.disabled = true);
+        })
+        .catch(console.error);
     }
   </script>
 </body>
