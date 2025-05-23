@@ -18,113 +18,112 @@
   </div>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-    import {
-      getDatabase, ref, onValue,
-      push, onDisconnect, set,
-      runTransaction
-    } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+  import {
+    getDatabase, ref, onValue,
+    push, onDisconnect, set, runTransaction
+  } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
-    // 1) Tu configuración Firebase
-    const firebaseConfig = {
-      apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
-      authDomain: "poll-e8e49.firebaseapp.com",
-      databaseURL: "https://poll-e8e49-default-rtdb.firebaseio.com",
-      projectId: "poll-e8e49",
-      storageBucket: "poll-e8e49.firebasestorage.app",
-      messagingSenderId: "957719245646",
-      appId: "1:957719245646:web:490403f5587901efcde41f",
-    };
-    const app = initializeApp(firebaseConfig);
-    const db  = getDatabase(app);
+  // 1) Inicializa Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
+    authDomain: "poll-e8e49.firebaseapp.com",
+    databaseURL: "https://poll-e8e49-default-rtdb.firebaseio.com",
+    projectId: "poll-e8e49",
+    storageBucket: "poll-e8e49.firebasestorage.app",
+    messagingSenderId: "957719245646",
+    appId: "1:957719245646:web:490403f5587901efcde41f",
+  };
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
 
-    // 2) Presencia de usuario
-    const connectionsRef = ref(db, "connections");
-    const myConnRef = push(connectionsRef);
-    set(myConnRef, true);
-    onDisconnect(myConnRef).remove();
+  // 2) Presencia de usuario
+  const connectionsRef = ref(db, "connections");
+  const myConnRef = push(connectionsRef);
+  set(myConnRef, true);
+  onDisconnect(myConnRef).remove();
 
-    // 3) Control del host
-    const hostRef = ref(db, "host");
+  // 3) Referencia de control host
+  const hostRef = ref(db, "host");
 
-    // 4) Definición de preguntas
-    const preguntas = [
-      { text: "¿Cuál es tu color favorito?",   options: ["Rojo","Azul","Verde","Amarillo"] },
-      { text: "¿Cuál es tu animal favorito?",  options: ["Perro","Gato","Pez","Pájaro"] },
-      { text: "¿Qué estación prefieres?",      options: ["Verano","Invierno","Otoño","Primavera"] }
-    ];
+  // 4) Preguntas
+  const preguntas = [
+    { text: "¿Cuál es tu color favorito?",   options: ["Rojo","Azul","Verde","Amarillo"] },
+    { text: "¿Cuál es tu animal favorito?",  options: ["Perro","Gato","Pez","Pájaro"] },
+    { text: "¿Qué estación prefieres?",      options: ["Verano","Invierno","Otoño","Primavera"] }
+  ];
 
-    // 5) Elementos UI
-    const waitingDiv  = document.getElementById("waiting");
-    const qSection    = document.getElementById("question-section");
-    const qText       = document.getElementById("question-text");
-    const optsDiv     = document.getElementById("options");
-    const cdDiv       = document.getElementById("countdown");
+  // 5) UI
+  const waitingDiv  = document.getElementById("waiting");
+  const qSection    = document.getElementById("question-section");
+  const qText       = document.getElementById("question-text");
+  const optsDiv     = document.getElementById("options");
+  const cdDiv       = document.getElementById("countdown");
 
-    let lastIdx = null, timerHandle = null;
+  let lastIdx = null, timerHandle = null;
 
-    // 6) Asegurar estado inicial en hostRef
-    onValue(hostRef, snap => {
-      if (snap.val() === null) {
-        set(hostRef, { active: false, questionIndex: null });
-      }
-    }, { onlyOnce: true });
+  // 6) Forzar estado inicial en hostRef **antes** del listener**
+  (async () => {
+    const snap = await import("https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js")
+      .then(m=>m.get(ref(db,"host")) )
+      .catch(()=>null);
+    if (snap === null || snap.val() === null) {
+      // Setea explicitamente inactivo
+      set(hostRef, { active: false, questionIndex: null });
+    }
 
-    // 7) Escucha cambios de host
-    onValue(hostRef, snap => {
-      const data = snap.val();
-      if (data && data.active === true && typeof data.questionIndex === "number") {
-        if (data.questionIndex !== lastIdx) {
-          lastIdx = data.questionIndex;
-          startQuestion(data.questionIndex);
-        }
-      } else {
-        // Sala de espera
+    // 7) Ahora que existe un estado, enganchamos el listener
+    onValue(hostRef, snap2 => {
+      const data = snap2.val();
+      // Si host aún no activó, quedamos en sala de espera
+      if (!data || data.active !== true) {
         waitingDiv.style.display = "";
         qSection.style.display   = "none";
+        return;
+      }
+      // Si host activó con un índice válido
+      const idx = data.questionIndex;
+      if (typeof idx === "number" && idx !== lastIdx) {
+        lastIdx = idx;
+        startQuestion(idx);
       }
     });
+  })();
 
-    // 8) Mostrar pregunta y countdown
-    function startQuestion(idx) {
-      waitingDiv.style.display = "none";
-      qSection.style.display   = "";
+  // 8) Función para arrancar la pregunta + countdown
+  function startQuestion(idx) {
+    waitingDiv.style.display = "none";
+    qSection.style.display   = "";
 
-      // Renderizar pregunta
-      const p = preguntas[idx];
-      qText.textContent = p.text;
-      optsDiv.innerHTML = "";
-      p.options.forEach(opt => {
-        const btn = document.createElement("button");
-        btn.textContent = opt;
-        btn.onclick = () => submitVote(idx, opt);
-        optsDiv.appendChild(btn);
-      });
+    // Renderiza pregunta y opciones
+    const p = preguntas[idx];
+    qText.textContent = p.text;
+    optsDiv.innerHTML = "";
+    p.options.forEach(opt => {
+      const btn = document.createElement("button");
+      btn.textContent = opt;
+      btn.onclick = () => {
+        const voteRef = ref(db, `votes/q${idx}/${opt}`);
+        runTransaction(voteRef, (c=0)=>c+1);
+        Array.from(optsDiv.children).forEach(b=>b.disabled=true);
+      };
+      optsDiv.appendChild(btn);
+    });
 
-      // Iniciar cuenta regresiva de 15s
-      let t = 15;
+    // Countdown 15s
+    let t = 15;
+    cdDiv.textContent = `Tiempo restante: ${t}s`;
+    if (timerHandle) clearInterval(timerHandle);
+    timerHandle = setInterval(() => {
+      t--;
       cdDiv.textContent = `Tiempo restante: ${t}s`;
-      if (timerHandle) clearInterval(timerHandle);
-      timerHandle = setInterval(() => {
-        t--;
-        cdDiv.textContent = `Tiempo restante: ${t}s`;
-        if (t <= 0) {
-          clearInterval(timerHandle);
-          Array.from(optsDiv.children).forEach(b => b.disabled = true);
-          cdDiv.textContent = "Esperando siguiente pregunta…";
-        }
-      }, 1000);
-    }
-
-    // 9) Enviar voto con transacción
-    function submitVote(idx, option) {
-      const voteRef = ref(db, `votes/q${idx}/${option}`);
-      runTransaction(voteRef, (current = 0) => current + 1)
-        .then(() => {
-          Array.from(optsDiv.children).forEach(b => b.disabled = true);
-        })
-        .catch(console.error);
-    }
-  </script>
+      if (t <= 0) {
+        clearInterval(timerHandle);
+        Array.from(optsDiv.children).forEach(b=>b.disabled=true);
+        cdDiv.textContent = "Esperando siguiente pregunta…";
+      }
+    }, 1000);
+  }
+</script>
 </body>
 </html>
