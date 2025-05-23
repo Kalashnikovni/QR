@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Encuesta - Resultados y Control</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="estilos.css" />
   <style>
     #connected-count {
       font-weight: bold;
@@ -95,12 +95,14 @@
     const myConnRef = push(connectionsRef);
     onDisconnect(myConnRef).remove();
     set(myConnRef, true);
+    
 
     const connectedCountElem = document.getElementById("connected-count");
-    onValue(connectionsRef, (snap) => {
-      const count = snap.size || 0;
-      connectedCountElem.textContent = `Conectados: ${count}`;
-    });
+    // Mostrar cantidad de conectados
+onValue(connectionsRef, (snap) => {
+  const count = snap.numChildren(); // CORRECTO: numChildren() no snap.size
+  connectedCountElem.textContent = `Conectados: ${count}`;
+});
 
     const questionIndexRef = ref(db, "host/questionIndex");
     const answersRef = ref(db, "answers");
@@ -125,14 +127,15 @@
     let countdownTimer = null;
     const countdownDuration = 15; // segundos para responder
 
-    startBtn.onclick = () => {
-      if (currentQuestionIndex === -1) {
-        currentQuestionIndex = 0;
-        updateQuestionIndex(currentQuestionIndex);
-        startBtn.disabled = true;
-        runCountdown();
-      }
-    };
+    // Botón para iniciar encuesta
+startBtn.onclick = () => {
+  if (currentQuestionIndex === -1) {
+    currentQuestionIndex = 0;
+    updateQuestionIndex(currentQuestionIndex);
+    startBtn.disabled = true;
+    runCountdown();
+  }
+};
 
     function updateQuestionIndex(index) {
       set(questionIndexRef, index);
