@@ -21,10 +21,10 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import {
       getDatabase, ref, onValue,
-      push, onDisconnect, set, runTransaction
+      push, onDisconnect, runTransaction
     } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
-    // 1) Inicializa Firebase (reemplaza con tu config)
+    // 1) Configura tu Firebase aquí:
     const firebaseConfig = {
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
       authDomain: "poll-e8e49.firebaseapp.com",
@@ -35,15 +35,17 @@
       appId: "1:957719245646:web:490403f5587901efcde41f",
     };
     const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+    const db  = getDatabase(app);
 
-    // 2) Sistema de presencia
+    // 2) Presencia
     const connectionsRef = ref(db, "connections");
     const myConn = push(connectionsRef);
-    set(myConn, true);
-    onDisconnect(myConn).remove();
+    setTimeout(() => { // set timeout small to avoid race
+      runTransaction(myConn, () => true);
+      onDisconnect(myConn).remove();
+    }, 0);
 
-    // 3) Datos compartidos
+    // 3) Lectura del control del host
     const hostRef = ref(db, "host");
 
     // 4) Preguntas
@@ -58,34 +60,40 @@
     const qSection    = document.getElementById("question-section");
     const qText       = document.getElementById("question-text");
     const optsDiv     = document.getElementById("options");
-    const countdownEl = document.getElementById("countdown");
+    const cdDiv       = document.getElementById("countdown");
 
-    let lastIndex = null;
-    let timerHandle = null;
+    let lastIdx = null, timerHandle = null;
 
-    // 6) Escucha instrucciones del host
+    // 6) Al cargar, asegúrate de que hostRef esté en estado inicial
+    // Solo si no existe, ponlo en inactive
+    onValue(hostRef, snap => {
+      if (snap.val() === null) {
+        hostRef && runTransaction(hostRef, () => ({ active: false, questionIndex: null }));
+      }
+    }, { onlyOnce: true });
+
+    // 7) Escucha cambios de host
     onValue(hostRef, snap => {
       const data = snap.val();
-      if (data && data.active && typeof data.questionIndex === "number") {
-        const idx = data.questionIndex;
-        if (idx !== lastIndex) {
-          lastIndex = idx;
-          startQuestion(idx);
+      if (data && data.active === true && typeof data.questionIndex === "number") {
+        if (data.questionIndex !== lastIdx) {
+          lastIdx = data.questionIndex;
+          startQuestion(data.questionIndex);
         }
       } else {
         // sala de espera
         waitingDiv.style.display = "";
-        qSection.style.display = "none";
+        qSection.style.display   = "none";
       }
     });
 
-    // 7) Mostrar pregunta y countdown
+    // 8) Función para mostrar pregunta + countdown
     function startQuestion(idx) {
       waitingDiv.style.display = "none";
-      qSection.style.display = "";
-      countdownEl.textContent = "";
+      qSection.style.display   = "";
+      cdDiv.textContent        = "";
 
-      // render pregunta
+      // render pregunta y opciones
       const p = preguntas[idx];
       qText.textContent = p.text;
       optsDiv.innerHTML = "";
@@ -96,32 +104,27 @@
         optsDiv.appendChild(btn);
       });
 
-      // countdown 15s
+      // 15s countdown
       let t = 15;
-      countdownEl.textContent = `Tiempo restante: ${t}s`;
+      cdDiv.textContent = `Tiempo restante: ${t}s`;
       if (timerHandle) clearInterval(timerHandle);
       timerHandle = setInterval(() => {
         t--;
-        countdownEl.textContent = `Tiempo restante: ${t}s`;
+        cdDiv.textContent = `Tiempo restante: ${t}s`;
         if (t <= 0) {
           clearInterval(timerHandle);
-          // desactivar botones
           Array.from(optsDiv.children).forEach(b => b.disabled = true);
-          countdownEl.textContent = "Esperando siguiente pregunta…";
+          cdDiv.textContent = "Esperando siguiente pregunta…";
         }
       }, 1000);
     }
 
+    // 9) Función para votar con transacción
     function submitVote(idx, option) {
-      // Referencia a la ruta votes/q{idx}
-      const vr = ref(db, `votes/q${idx}`);
-      // Creamos un nodo único
-      const vpush = push(vr);
-      // Guardamos el valor con la función set()
-      set(vpush, option)
+      const voteRef = ref(db, `votes/q${idx}/${option}`);
+      runTransaction(voteRef, (current = 0) => current + 1)
         .then(() => {
-          // Desactivar botones tras enviar
-          Array.from(optsDiv.children).forEach(btn => btn.disabled = true);
+          Array.from(optsDiv.children).forEach(b => b.disabled = true);
         })
         .catch(console.error);
     }
