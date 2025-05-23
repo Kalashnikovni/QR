@@ -37,9 +37,6 @@
 
     // 2) Presencia del host (opcional, puede omitirse)
     const connectionsRef = ref(db, "connections");
-    const myConn = push(connectionsRef);
-    myConn.set(true);
-    onDisconnect(myConn).remove();
 
     // 3) Mostrar cantidad de conectados
     const connectedCountDiv = document.getElementById("connected-count");
