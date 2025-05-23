@@ -13,6 +13,7 @@ body {
   text-align: center;
   padding: 0px;
   color: #333;
+  min-height: 100vh;
 }
 
 @keyframes gradient {
