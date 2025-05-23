@@ -65,6 +65,8 @@
 
     // 6) Control del host en BD
     const hostRef = ref(db, "host");
+    // Reseteamos el estado al cargar la página:
+    set(hostRef, { active: false, questionIndex: null });
 
     // Inicializa hostRef una sola vez
     onValue(hostRef, snap => {
