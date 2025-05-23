@@ -55,25 +55,35 @@
     }
 
     .option {
-      cursor: pointer;
-      font-size: 20px;
-      padding: 20px;
-      border-bottom: 1px solid #eee;
-      background-color: #fff;
-    }
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: 600;
+  color: #00796b;             /* Verde azulado, para buena lectura */
+  padding: 18px 25px;         /* Más espacio para que sea cómodo */
+  border-bottom: 1px solid #ddd;
+  background-color: #e0f2f1;  /* Fondo suave, muy sutil */
+  border-radius: 12px;        /* Bordes redondeados */
+  box-shadow: 0 2px 5px rgba(0, 121, 107, 0.15);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  user-select: none;          /* Evita seleccionar texto accidental */
+}
 
     .option:last-child {
       border-bottom: none;
     }
 
     .option:hover {
-      background-color: #e0f7fa;
-    }
+  background-color: #b2dfdb;  /* Cambio suave al pasar el mouse */
+  box-shadow: 0 6px 15px rgba(0, 121, 107, 0.3);
+  color: #004d40;             /* Más oscuro al hover */
+}
 
-    .disabled {
-      pointer-events: none;
-      opacity: 0.6;
-    }
+.disabled {
+  background-color: #a7c7c5;
+  color: #4a6463;
+  box-shadow: none;
+  cursor: default;
+}
 
     .progress-bar {
       display: none;
