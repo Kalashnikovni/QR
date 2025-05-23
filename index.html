@@ -75,6 +75,21 @@
     Tu navegador no soporta audio HTML5.
   </audio>
 
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js">
+    QRCode.toDataURL(window.location.href)
+  .then((url) => {
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = "QR code para la encuesta";
+    img.style.width = "150px";
+    document.getElementById("qr-code").appendChild(img);
+  })
+  .catch((err) => {
+    console.error("Error generando QR:", err);
+  });
+
+  </script>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
@@ -188,22 +203,6 @@
     });
 
     showQuestion();
-
-    // QR code para compartir la página actual
-    import { toDataURL } from "https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.mjs";
-    (async () => {
-      try {
-        const url = window.location.href;
-        const dataUrl = await toDataURL(url);
-        const img = document.createElement("img");
-        img.src = dataUrl;
-        img.alt = "QR code para la encuesta";
-        img.style.width = "150px";
-        document.getElementById("qr-code").appendChild(img);
-      } catch (e) {
-        console.error("Error generando QR:", e);
-      }
-    })();
   </script>
 </body>
 </html>
