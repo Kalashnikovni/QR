@@ -3,81 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Encuesta - Resultados y Control</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="estilos.css" />
-  <style>
-    #connected-count {
-      font-weight: bold;
-      font-size: 24px;
-      color: white;
-      text-shadow: 1px 1px 3px #000;
-      margin-bottom: 20px;
-    }
-    #results-container {
-      background: #ffffffdd;
-      border-radius: 16px;
-      padding: 20px;
-      max-width: 600px;
-      margin: auto;
-      box-shadow: 0 6px 15px rgba(0,0,0,0.2);
-    }
-    #countdown {
-      font-size: 36px;
-      font-weight: 700;
-      margin: 15px 0 30px 0;
-      color: #004d40;
-      text-shadow: 1px 1px 3px #a7c7c5;
-    }
-    #start-btn {
-      background-color: #4db6ac;
-      color: white;
-      font-size: 22px;
-      font-weight: 700;
-      border: none;
-      border-radius: 12px;
-      padding: 15px 25px;
-      cursor: pointer;
-      margin-bottom: 25px;
-      width: 90%;
-      max-width: 500px;
-      transition: background-color 0.3s;
-    }
-    #start-btn:hover {
-      background-color: #00897b;
-    }
-    canvas {
-      max-width: 100%;
-      height: auto !important;
-    }
-  </style>
+  <title>Encuesta – Panel Host</title>
 </head>
 <body>
-  <h1>Panel de Control</h1>
+  <h1>Panel del Host</h1>
   <div id="connected-count">Conectados: 0</div>
   <button id="start-btn">Iniciar Encuesta</button>
+  <div id="countdown" style="font-size:2em; margin:20px 0;"></div>
+  <h2 id="question-text"></h2>
+  <canvas id="chart" style="max-width:90%;"></canvas>
+  <button id="next-btn" style="display:none;">Siguiente Pregunta</button>
 
-  <div id="countdown" style="display:none;"></div>
-
-  <div id="results-container" style="display:none;">
-    <canvas id="results-chart"></canvas>
-  </div>
-
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import {
-      getDatabase,
-      ref,
-      push,
-      onDisconnect,
-      onValue,
-      set,
-      update,
-      serverTimestamp,
+      getDatabase, ref, onValue, set, push, onDisconnect
     } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
-    import Chart from "https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.esm.js";
-
+    // === Config Firebase ===
     const firebaseConfig = {
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
       authDomain: "poll-e8e49.firebaseapp.com",
@@ -87,143 +31,96 @@
       messagingSenderId: "957719245646",
       appId: "1:957719245646:web:490403f5587901efcde41f",
     };
-
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
+    // === Sistema de presencia ===
     const connectionsRef = ref(db, "connections");
-    const myConnRef = push(connectionsRef);
-    onDisconnect(myConnRef).remove();
-    set(myConnRef, true);
-    
+    const myConn = push(connectionsRef);
+    myConn.set(true);
+    onDisconnect(myConn).remove();
 
-    const connectedCountElem = document.getElementById("connected-count");
-    // Mostrar cantidad de conectados
-onValue(connectionsRef, (snap) => {
-  const count = snap.numChildren(); // CORRECTO: numChildren() no snap.size
-  connectedCountElem.textContent = `Conectados: ${count}`;
-});
+    const connectedCountDiv = document.getElementById("connected-count");
+    onValue(connectionsRef, snap => {
+      connectedCountDiv.textContent = `Conectados: ${snap.numChildren()}`;
+    });
 
-    const questionIndexRef = ref(db, "host/questionIndex");
-    const answersRef = ref(db, "answers");
-
-    const questions = [
-      {
-        text: "¿Cuál es tu color favorito?",
-        options: ["Rojo", "Azul", "Verde", "Amarillo"],
-      },
-      {
-        text: "¿Cuál es tu comida preferida?",
-        options: ["Pizza", "Sushi", "Hamburguesa", "Ensalada"],
-      },
+    // === Preguntas ===
+    const preguntas = [
+      { text: "¿Cuál es tu color favorito?", options: ["Rojo","Azul","Verde","Amarillo"] },
+      { text: "¿Cuál es tu animal favorito?", options: ["Perro","Gato","Pez","Pájaro"] },
+      { text: "¿Qué estación prefieres?", options: ["Verano","Invierno","Otoño","Primavera"] }
     ];
 
+    // Elementos UI
     const startBtn = document.getElementById("start-btn");
-    const countdownElem = document.getElementById("countdown");
-    const resultsContainer = document.getElementById("results-container");
-    const ctx = document.getElementById("results-chart").getContext("2d");
+    const nextBtn  = document.getElementById("next-btn");
+    const countdownDiv = document.getElementById("countdown");
+    const qText = document.getElementById("question-text");
+    const chartCtx = document.getElementById("chart").getContext("2d");
 
-    let currentQuestionIndex = -1;
-    let countdownTimer = null;
-    const countdownDuration = 15; // segundos para responder
+    let current = -1, chartInstance = null;
 
-    // Botón para iniciar encuesta
-startBtn.onclick = () => {
-  if (currentQuestionIndex === -1) {
-    currentQuestionIndex = 0;
-    updateQuestionIndex(currentQuestionIndex);
-    startBtn.disabled = true;
-    runCountdown();
-  }
-};
+    // Control del host en la base
+    const hostRef = ref(db, "host");
 
-    function updateQuestionIndex(index) {
-      set(questionIndexRef, index);
+    startBtn.onclick = () => {
+      // iniciar con primera pregunta
+      current = 0;
+      set(hostRef, { active: true, questionIndex: current });
+      startBtn.style.display = "none";
+      runRound();
+    };
+
+    nextBtn.onclick = () => {
+      if (current+1 < preguntas.length) {
+        current++;
+        set(hostRef, { active: true, questionIndex: current });
+        nextBtn.style.display = "none";
+        runRound();
+      }
+    };
+
+    function runRound() {
+      // limpiar
+      qText.textContent = preguntas[current].text;
+      countdownDiv.textContent = `Tiempo restante: 15s`;
+      if (chartInstance) { chartInstance.destroy(); }
+      document.getElementById("chart").style.display = "none";
+
+      // countdown
+      let t = 15;
+      const iv = setInterval(() => {
+        t--;
+        countdownDiv.textContent = `Tiempo restante: ${t}s`;
+        if (t <= 0) {
+          clearInterval(iv);
+          countdownDiv.textContent = "";
+          showResults();
+        }
+      }, 1000);
     }
 
-    async function runCountdown() {
-      countdownElem.style.display = "block";
-      resultsContainer.style.display = "none";
-
-      for (let i = countdownDuration; i >= 0; i--) {
-        countdownElem.textContent = `Tiempo restante: ${i}s`;
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-      countdownElem.style.display = "none";
-
-      // Mostrar resultados para la pregunta actual
-      showResults(currentQuestionIndex);
-
-      // Después de mostrar resultados, habilitar botón para siguiente pregunta si hay más
-      if (currentQuestionIndex + 1 < questions.length) {
-        startBtn.textContent = "Siguiente Pregunta";
-        startBtn.disabled = false;
-        startBtn.onclick = () => {
-          currentQuestionIndex++;
-          updateQuestionIndex(currentQuestionIndex);
-          startBtn.disabled = true;
-          resultsContainer.style.display = "none";
-          runCountdown();
-        };
-      } else {
-        startBtn.textContent = "Encuesta finalizada";
-        startBtn.disabled = true;
-        set(questionIndexRef, null);
-      }
-    }
-
-    function showResults(questionIdx) {
-      resultsContainer.style.display = "block";
-
-      onValue(ref(db, `answers/${questionIdx}`), (snap) => {
+    function showResults() {
+      // lee votos y dibuja gráfico
+      const voteRef = ref(db, `votes/q${current}`);
+      onValue(voteRef, snap => {
         const data = snap.val() || {};
-        // Contar respuestas
-        const counts = Array(questions[questionIdx].options.length).fill(0);
-        Object.values(data).forEach((v) => {
-          if (typeof v === "number" && v >= 0 && v < counts.length) {
-            counts[v]++;
-          }
-        });
-
-        renderChart(questions[questionIdx].options, counts);
+        const counts = preguntas[current].options.map(opt =>
+          Object.values(data).filter(v => v === true && Object.keys(data).includes(opt) && true).length
+        );
+        drawChart(preguntas[current].options, counts);
       }, { onlyOnce: true });
     }
 
-    let chartInstance = null;
-    function renderChart(labels, data) {
-      if (chartInstance) chartInstance.destroy();
-      chartInstance = new Chart(ctx, {
-        type: "bar",
-        data: {
-          labels,
-          datasets: [{
-            label: "Cantidad de votos",
-            data,
-            backgroundColor: "rgba(77, 182, 172, 0.8)",
-            borderColor: "rgba(38, 166, 154, 1)",
-            borderWidth: 1,
-            borderRadius: 6,
-          }],
-        },
-        options: {
-          responsive: true,
-          animation: {
-            duration: 800,
-            easing: 'easeOutQuart',
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              ticks: { stepSize: 1, precision: 0 }
-            }
-          },
-          plugins: {
-            legend: {
-              display: false,
-            },
-          },
-        },
+    function drawChart(labels, data) {
+      document.getElementById("chart").style.display = "block";
+      chartInstance = new Chart(chartCtx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Votos', data }] },
+        options: { scales: { y: { beginAtZero: true, precision:0 } } }
       });
+      if (current+1 < preguntas.length) nextBtn.style.display = "inline-block";
     }
   </script>
 </body>
