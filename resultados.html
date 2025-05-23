@@ -34,6 +34,29 @@
       border-radius: 10px;
       font-weight: bold;
     }
+
+    #connected-count {
+  font-size: 22px;
+  font-weight: bold;
+  color: #ffffff;
+  background: rgba(0, 150, 136, 0.8);
+  padding: 12px 20px;
+  border-radius: 10px;
+  display: inline-block;
+  margin-top: 20px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+    #results-container {
+  margin-top: 40px;
+  background-color: rgba(255, 255, 255, 0.85);
+  border-radius: 20px;
+  padding: 20px;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
   </style>
 </head>
 <body>
@@ -42,7 +65,7 @@
   <div id="question-text">Esperando a comenzar…</div>
   <button id="start-btn">Iniciar Encuesta</button>
   <div id="countdown"></div>
-  <div id="bar-container"></div>
+  <div id="results-container"></div>
   <button id="next-btn" style="display:none">Siguiente Pregunta</button>
 
   <script type="module">
@@ -78,11 +101,12 @@
     let current = 0;
 
     // Mostrar cantidad de conectados
-    const connectedRef = ref(db, "connected");
-    onValue(connectedRef, (snap) => {
-      connectedCountEl.textContent = "Conectados: " + (snap.val() || 0);
-    });
+    const connectedRef = ref(db, "connectedUsers");
 
+onValue(connectedRef, (snapshot) => {
+  const count = snapshot.size || Object.keys(snapshot.val() || {}).length;
+  document.getElementById("connected-count").textContent = `Conectados: ${count}`;
+});
     // Iniciar encuesta
     startBtn.onclick = () => {
       set(ref(db, "state"), { status: "active", current: 0 });
