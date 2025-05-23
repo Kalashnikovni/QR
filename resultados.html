@@ -19,10 +19,10 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import {
       getDatabase, ref, onValue,
-      set, runTransaction, onDisconnect
+      set, push, onDisconnect
     } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
-    // 1) Config Firebase
+    // 1) Tu configuración Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
       authDomain: "poll-e8e49.firebaseapp.com",
@@ -35,14 +35,13 @@
     const app = initializeApp(firebaseConfig);
     const db  = getDatabase(app);
 
-    // 2) Presencia
+    // 2) Presencia de host (opcional)
     const connectionsRef = ref(db, "connections");
-    const myConn = runTransaction(runTransaction); // dummy to import runTransaction
-    const connPush = ref(db, "connections");
-    const myNode = runTransaction; // dummy
-    //-- skip presence for host if desired --
+    const myConnRef = push(connectionsRef);
+    set(myConnRef, true);
+    onDisconnect(myConnRef).remove();
 
-    // 3) Contador de conectados
+    // 3) Mostrar conectados
     onValue(connectionsRef, snap => {
       const data = snap.val() || {};
       document.getElementById("connected-count")
@@ -62,17 +61,19 @@
     const cdDiv    = document.getElementById("countdown");
     const qText    = document.getElementById("question-text");
     const chartEl  = document.getElementById("chart");
-    let chartInst  = null, current = -1;
+    let chartInst  = null, current=-1;
 
-    // 6) Control DB
+    // 6) Control del host en BD
     const hostRef = ref(db, "host");
-    // Inicializar hostRef
+
+    // Inicializa hostRef una sola vez
     onValue(hostRef, snap => {
-      if (snap.val() === null) {
+      if (snap.val() == null) {
         set(hostRef, { active:false, questionIndex:null });
       }
     }, { onlyOnce:true });
 
+    // 7) Botones
     startBtn.onclick = () => {
       current = 0;
       set(hostRef, { active:true, questionIndex:0 });
@@ -80,7 +81,6 @@
       nextBtn.style.display  = "none";
       runRound();
     };
-
     nextBtn.onclick = () => {
       current++;
       set(hostRef, { active:true, questionIndex:current });
@@ -88,6 +88,7 @@
       runRound();
     };
 
+    // 8) Lógica de ciclo pregunta→countdown→resultados
     function runRound() {
       const p = preguntas[current];
       qText.textContent = p.text;
@@ -111,9 +112,7 @@
       const vr = ref(db, `votes/q${current}`);
       onValue(vr, snap => {
         const data = snap.val() || {};
-        const counts = preguntas[current].options.map(opt =>
-          data[opt] || 0
-        );
+        const counts = preguntas[current].options.map(opt => data[opt] || 0);
         drawChart(preguntas[current].options, counts);
       }, { onlyOnce:true });
     }
@@ -123,12 +122,13 @@
       const ctx = chartEl.getContext("2d");
       chartInst = new Chart(ctx, {
         type: 'bar',
-        data: { labels, datasets:[{ label:'Votos', data }] },
+        data: { labels, datasets: [{ label:'Votos', data }] },
         options:{ scales:{ y:{ beginAtZero:true, ticks:{stepSize:1} } } }
       });
-      if (current+1 < preguntas.length) {
+      if (current + 1 < preguntas.length) {
         nextBtn.style.display = "";
       } else {
+        // al final, desactivamos host
         set(hostRef, { active:false, questionIndex:null });
       }
     }
