@@ -3,37 +3,27 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Encuesta - Sala de Espera / Preguntas</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="estilos.css" />
+  <title>Encuesta – Participantes</title>
 </head>
 <body>
   <h1>Encuesta Anónima</h1>
-
-  <div id="waiting-room" style="display: none;">
-    <p>Esperando a que el host inicie la encuesta...</p>
-    <p id="connected-count" style="font-weight: bold; font-size: 22px; color: white; text-shadow: 1px 1px 2px #000;"></p>
+  <div id="waiting">
+    <p>Esperando a que el host inicie la encuesta…</p>
   </div>
 
-  <div id="question-section" style="display: none;">
-    <p id="question-text"></p>
-    <div id="options-container"></div>
-    <button id="next-btn" disabled>Enviar respuesta</button>
+  <div id="question-section" style="display:none;">
+    <h2 id="question-text"></h2>
+    <div id="options"></div>
+    <div id="countdown" style="font-size:2em; margin-top:1em;"></div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import {
-      getDatabase,
-      ref,
-      push,
-      onDisconnect,
-      onValue,
-      set,
-      update,
-      serverTimestamp,
+      getDatabase, ref, onValue, push, onDisconnect
     } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
+    // === Config Firebase ===
     const firebaseConfig = {
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
       authDomain: "poll-e8e49.firebaseapp.com",
@@ -43,97 +33,84 @@
       messagingSenderId: "957719245646",
       appId: "1:957719245646:web:490403f5587901efcde41f",
     };
-
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // Referencias
+    // === Sala de espera / presencia ===
     const connectionsRef = ref(db, "connections");
-    const myConnRef = push(connectionsRef);
-    onDisconnect(myConnRef).remove();
-    set(myConnRef, true);
+    const myConn = push(connectionsRef);
+    myConn.set(true);
+    onDisconnect(myConn).remove();
 
-    const hostControlRef = ref(db, "host/control");
-    const questionIndexRef = ref(db, "host/questionIndex");
-    const answersRef = ref(db, "answers");
-    const questions = [
-      {
-        text: "¿Cuál es tu color favorito?",
-        options: ["Rojo", "Azul", "Verde", "Amarillo"],
-      },
-      {
-        text: "¿Cuál es tu comida preferida?",
-        options: ["Pizza", "Sushi", "Hamburguesa", "Ensalada"],
-      },
+    // === Preguntas ===
+    const preguntas = [
+      { text: "¿Cuál es tu color favorito?", options: ["Rojo", "Azul", "Verde", "Amarillo"] },
+      { text: "¿Cuál es tu animal favorito?", options: ["Perro", "Gato", "Pez", "Pájaro"] },
+      { text: "¿Qué estación prefieres?", options: ["Verano", "Invierno", "Otoño", "Primavera"] }
     ];
 
-    // Elementos de UI
-    const waitingRoom = document.getElementById("waiting-room");
-    const questionSection = document.getElementById("question-section");
-    const questionText = document.getElementById("question-text");
-    const optionsContainer = document.getElementById("options-container");
-    const nextBtn = document.getElementById("next-btn");
+    // Elementos UI
+    const waitingDiv = document.getElementById("waiting");
+    const qSection = document.getElementById("question-section");
+    const qText = document.getElementById("question-text");
+    const optsDiv = document.getElementById("options");
+    const countdownDiv = document.getElementById("countdown");
 
-    let currentQuestionIndex = null;
-    let selectedOption = null;
+    let lastQuestion = null;
+    let timerHandle = null;
 
-    // Escuchar cambios en el índice de pregunta que controla el host
-    onValue(questionIndexRef, (snap) => {
-      const idx = snap.val();
-      if (typeof idx === "number" && idx >= 0 && idx < questions.length) {
-        currentQuestionIndex = idx;
-        showQuestion(idx);
-      } else {
-        // Encuesta no iniciada aún
-        currentQuestionIndex = null;
-        waitingRoom.style.display = "block";
-        questionSection.style.display = "none";
+    // Escucha control del host
+    const hostRef = ref(db, "host");
+    onValue(hostRef, snap => {
+      const data = snap.val();
+      if (data && data.active === true && typeof data.questionIndex === "number") {
+        const idx = data.questionIndex;
+        if (idx !== lastQuestion) {
+          lastQuestion = idx;
+          startQuestion(idx);
+        }
       }
     });
 
-    function showQuestion(index) {
-      waitingRoom.style.display = "none";
-      questionSection.style.display = "block";
-      selectedOption = null;
-      nextBtn.disabled = true;
+    function startQuestion(idx) {
+      // mostrar UI
+      waitingDiv.style.display = "none";
+      qSection.style.display = "block";
+      countdownDiv.textContent = "";
 
-      const q = questions[index];
-      questionText.textContent = q.text;
-      optionsContainer.innerHTML = "";
-
-      q.options.forEach((optionText, i) => {
-        const div = document.createElement("div");
-        div.classList.add("option");
-        div.textContent = optionText;
-        div.onclick = () => {
-          if (nextBtn.disabled === false) return; // ya respondido
-          selectedOption = i;
-          Array.from(optionsContainer.children).forEach((child) => {
-            child.classList.remove("selected");
-          });
-          div.classList.add("selected");
-          nextBtn.disabled = false;
-        };
-        optionsContainer.appendChild(div);
+      // render pregunta y opciones
+      const p = preguntas[idx];
+      qText.textContent = p.text;
+      optsDiv.innerHTML = "";
+      p.options.forEach(opt => {
+        const btn = document.createElement("button");
+        btn.textContent = opt;
+        btn.onclick = () => submitVote(idx, opt);
+        optsDiv.appendChild(btn);
       });
+
+      // iniciar cuenta regresiva 15s
+      let t = 15;
+      countdownDiv.textContent = `Tiempo restante: ${t}s`;
+      if (timerHandle) clearInterval(timerHandle);
+      timerHandle = setInterval(() => {
+        t--;
+        countdownDiv.textContent = `Tiempo restante: ${t}s`;
+        if (t <= 0) {
+          clearInterval(timerHandle);
+          // al terminar, deshabilitar opciones
+          Array.from(optsDiv.children).forEach(b => b.disabled = true);
+          countdownDiv.textContent = "Esperando siguiente pregunta...";
+        }
+      }, 1000);
     }
 
-    nextBtn.onclick = () => {
-      if (selectedOption === null || currentQuestionIndex === null) return;
-
-      // Guardar respuesta en la base, anonimamente
-      // Cada respuesta: /answers/{questionIndex}/{uniquePushKey}: optionIndex
-      const ansRef = ref(db, `answers/${currentQuestionIndex}`);
-      const ansPush = push(ansRef);
-      set(ansPush, selectedOption);
-
-      // Deshabilitar botón y opciones tras enviar
-      nextBtn.disabled = true;
-      Array.from(optionsContainer.children).forEach((child) => {
-        child.classList.add("disabled");
-        child.onclick = null;
-      });
-    };
+    function submitVote(idx, option) {
+      // push a /votes/{idx}/{option}
+      const voteRef = ref(db, `votes/q${idx}/${option}`);
+      push(voteRef).set(true);
+    }
   </script>
 </body>
 </html>
+
