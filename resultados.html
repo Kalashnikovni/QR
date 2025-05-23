@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Resultados en Vivo</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      background: linear-gradient(-45deg, #f9f9f9, #e1f5fe, #fff3e0, #fce4ec);
+      background-size: 400% 400%;
+      animation: gradient 15s ease infinite;
+      text-align: center;
+      padding: 30px;
+    }
+
+    @keyframes gradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 40px;
+      font-size: 36px;
+    }
+
+    .question-block {
+      margin-bottom: 50px;
+    }
+
+    .question-title {
+      font-size: 22px;
+      font-weight: bold;
+      color: #444;
+      margin-bottom: 15px;
+    }
+
+    .option-container {
+      margin: 10px auto;
+      width: 95%;
+      max-width: 600px;
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+
+    .option-label {
+      font-size: 18px;
+      padding: 12px;
+      background-color: #fafafa;
+      border-bottom: 1px solid #eee;
+    }
+
+    .progress-bar {
+      height: 24px;
+      background: #4dd0e1;
+      border-radius: 0 0 16px 16px;
+      color: white;
+      font-size: 14px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: width 0.4s;
+    }
+  </style>
+</head>
+<body>
+  <h1>Resultados en Vivo</h1>
+  <div id="results-container">Cargando resultados...</div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
+      authDomain: "poll-e8e49.firebaseapp.com",
+      databaseURL: "https://poll-e8e49-default-rtdb.firebaseio.com",
+      projectId: "poll-e8e49",
+      storageBucket: "poll-e8e49.appspot.com",
+      messagingSenderId: "957719245646",
+      appId: "1:957719245646:web:490403f5587901efcde41f"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const questions = [
+      {
+        key: "q0",
+        question: "¿Cuál es tu color favorito?",
+        options: ["Rojo", "Azul", "Verde", "Amarillo"]
+      },
+      {
+        key: "q1",
+        question: "¿Cuál es tu animal favorito?",
+        options: ["Perro", "Gato", "Pez", "Pájaro"]
+      },
+      {
+        key: "q2",
+        question: "¿Cuál es tu estación favorita?",
+        options: ["Verano", "Invierno", "Otoño", "Primavera"]
+      }
+    ];
+
+    const container = document.getElementById("results-container");
+
+    function renderResults(votes) {
+      container.innerHTML = "";
+      questions.forEach(({ key, question, options }) => {
+        const block = document.createElement("div");
+        block.className = "question-block";
+
+        const title = document.createElement("div");
+        title.className = "question-title";
+        title.textContent = question;
+        block.appendChild(title);
+
+        const totalVotes = votes?.[key]
+          ? Object.values(votes[key]).reduce((a, b) => a + b, 0)
+          : 0;
+
+        options.forEach((opt) => {
+          const count = votes?.[key]?.[opt] || 0;
+          const percent = totalVotes ? ((count / totalVotes) * 100).toFixed(1) : 0;
+
+          const containerDiv = document.createElement("div");
+          containerDiv.className = "option-container";
+
+          const label = document.createElement("div");
+          label.className = "option-label";
+          label.textContent = `${opt} (${count} voto${count !== 1 ? 's' : ''})`;
+
+          const bar = document.createElement("div");
+          bar.className = "progress-bar";
+          bar.style.width = percent + "%";
+          bar.textContent = `${percent}%`;
+
+          containerDiv.appendChild(label);
+          containerDiv.appendChild(bar);
+          block.appendChild(containerDiv);
+        });
+
+        container.appendChild(block);
+      });
+    }
+
+    const votesRef = ref(db, "votes");
+    onValue(votesRef, (snapshot) => {
+      const votes = snapshot.val();
+      renderResults(votes);
+    });
+  </script>
+</body>
+</html>
