@@ -1,12 +1,79 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <title>Test Firebase DB</title>
+<meta charset="UTF-8" />
+  <title>Encuesta Interactiva</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #fdfbfb, #ebedee);
+      text-align: center;
+      padding: 30px;
+    }
+    h1 {
+      color: #333;
+    }
+    #question-text {
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+    .option-container {
+      margin: 10px auto;
+      width: 80%;
+      max-width: 500px;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      padding: 10px;
+    }
+    .option {
+      cursor: pointer;
+      font-size: 18px;
+      padding: 10px;
+      border-radius: 8px;
+      transition: background 0.3s;
+    }
+    .option:hover {
+      background-color: #e0f7fa;
+    }
+    .disabled {
+      pointer-events: none;
+      opacity: 0.6;
+    }
+    .progress-bar {
+      height: 10px;
+      background: #4dd0e1;
+      border-radius: 8px;
+      margin-top: 5px;
+      transition: width 0.4s;
+    }
+    #next-btn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #4db6ac;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      display: none;
+    }
+    #qr-code {
+      margin-top: 30px;
+    }
+  </style>
 </head>
 <body>
-  <h1>Test conexión Firebase</h1>
-  <div id="status">Conectando...</div>
+  <h1>Encuesta Interactiva</h1>
+  <div id="question-text">Cargando pregunta...</div>
+  <div id="options"></div>
+  <button id="next-btn">Siguiente pregunta</button>
+  <div id="qr-code"></div>
+
+  <!-- Música de fondo -->
+  <audio autoplay loop>
+    <source src="https://cdn.pixabay.com/audio/2023/03/14/audio_2e91fcd1c3.mp3" type="audio/mpeg">
+    Tu navegador no soporta audio HTML5.
+  </audio>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
@@ -25,19 +92,118 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    const statusDiv = document.getElementById("status");
+    const questions = [
+      {
+        question: "¿Cuál es tu color favorito?",
+        options: ["Rojo", "Azul", "Verde", "Amarillo"],
+      },
+      {
+        question: "¿Cuál es tu animal favorito?",
+        options: ["Perro", "Gato", "Pez", "Pájaro"],
+      },
+      {
+        question: "¿Cuál es tu estación favorita?",
+        options: ["Verano", "Invierno", "Otoño", "Primavera"],
+      },
+    ];
 
-    // Intentamos leer un nodo /test (puedes crear ese nodo manualmente en Firebase)
-    get(ref(db, 'test')).then((snapshot) => {
-      if (snapshot.exists()) {
-        statusDiv.textContent = "Conexión OK! Valor en /test: " + JSON.stringify(snapshot.val());
-      } else {
-        statusDiv.textContent = "Conexión OK! Pero /test no tiene valor.";
-      }
-    }).catch((error) => {
-      statusDiv.textContent = "Error conectando a Firebase: " + error;
-      console.error(error);
+    let current = 0;
+    const questionText = document.getElementById("question-text");
+    const optionsDiv = document.getElementById("options");
+    const nextBtn = document.getElementById("next-btn");
+
+    function showQuestion() {
+      const q = questions[current];
+      questionText.textContent = q.question;
+      optionsDiv.innerHTML = "";
+
+      q.options.forEach((opt) => {
+        const div = document.createElement("div");
+        div.className = "option";
+        div.textContent = opt;
+
+        const progress = document.createElement("div");
+        progress.className = "progress-bar";
+        progress.style.width = "0%";
+
+        const container = document.createElement("div");
+        container.className = "option-container";
+        container.appendChild(div);
+        container.appendChild(progress);
+
+        div.addEventListener("click", () => vote(opt));
+
+        optionsDiv.appendChild(container);
+      });
+
+      nextBtn.style.display = "none";
+    }
+
+    function vote(option) {
+      const qKey = `q${current}`;
+      const voteRef = ref(db, `votes/${qKey}/${option}`);
+
+      runTransaction(voteRef, (currentValue) => {
+        return (currentValue || 0) + 1;
+      }).then(() => {
+        document.querySelectorAll(".option").forEach((el) => {
+          el.classList.add("disabled");
+          if (el.textContent === option) {
+            el.style.backgroundColor = "#b2ebf2";
+          }
+        });
+        nextBtn.style.display = current < questions.length - 1 ? "inline-block" : "none";
+      });
+    }
+
+    function updateVotesDisplay(votes) {
+      const qKey = `q${current}`;
+      if (!votes || !votes[qKey]) return;
+
+      const total = Object.values(votes[qKey]).reduce((a, b) => a + b, 0);
+      if (total === 0) return;
+
+      document.querySelectorAll(".option-container").forEach((container) => {
+        const label = container.querySelector(".option").textContent;
+        const count = votes[qKey][label] || 0;
+        const percent = ((count / total) * 100).toFixed(1);
+
+        const bar = container.querySelector(".progress-bar");
+        bar.style.width = percent + "%";
+        bar.textContent = percent + "%";
+      });
+    }
+
+    const votesRef = ref(db, "votes");
+    onValue(votesRef, (snapshot) => {
+      const data = snapshot.val();
+      updateVotesDisplay(data);
     });
+
+    nextBtn.addEventListener("click", () => {
+      current++;
+      if (current < questions.length) {
+        showQuestion();
+      }
+    });
+
+    showQuestion();
+
+    // QR code para compartir la página actual
+    import { toDataURL } from "https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.mjs";
+    (async () => {
+      try {
+        const url = window.location.href;
+        const dataUrl = await toDataURL(url);
+        const img = document.createElement("img");
+        img.src = dataUrl;
+        img.alt = "QR code para la encuesta";
+        img.style.width = "150px";
+        document.getElementById("qr-code").appendChild(img);
+      } catch (e) {
+        console.error("Error generando QR:", e);
+      }
+    })();
   </script>
 </body>
 </html>
