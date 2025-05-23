@@ -168,11 +168,12 @@
       });
     }
 
+    // Listener para los votos en Firebase
     const votesRef = ref(db, "votes");
-    firebase.database().ref("votes").on("value", (snapshot) => {
-  const votes = snapshot.val();
-  updateVotesDisplay(votes);
-});
+    onValue(votesRef, (snapshot) => {
+      const votes = snapshot.val();
+      updateVotesDisplay(votes);
+    });
 
 
     nextBtn.addEventListener("click", () => {
