@@ -45,7 +45,7 @@
     onValue(connectionsRef, snap => {
       const data = snap.val() || {};
       const count = Object.keys(data).length;
-      connectedCountDiv.textContent = `Conectados: ${count}`;
+      countDiv.textContent = `Conectados: ${count}`;
     });
 
   </script>
