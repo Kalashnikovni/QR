@@ -2,109 +2,224 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Resultados</title>
-  <link rel="stylesheet" href="estilos.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Encuesta - Resultados y Control</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
   <style>
     #connected-count {
-      font-size: 20px;
-      color: #fff;
-      background: rgba(0, 0, 0, 0.3);
-      padding: 10px;
-      border-radius: 10px;
-      display: inline-block;
-      margin-top: 20px;
+      font-weight: bold;
+      font-size: 24px;
+      color: white;
+      text-shadow: 1px 1px 3px #000;
+      margin-bottom: 20px;
     }
-    #bar-container {
-      margin: 40px auto;
-      max-width: 600px;
-      background: #ffffffcc;
+    #results-container {
+      background: #ffffffdd;
       border-radius: 16px;
       padding: 20px;
-      box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+      max-width: 600px;
+      margin: auto;
+      box-shadow: 0 6px 15px rgba(0,0,0,0.2);
     }
-    .bar {
-      height: 40px;
+    #countdown {
+      font-size: 36px;
+      font-weight: 700;
+      margin: 15px 0 30px 0;
+      color: #004d40;
+      text-shadow: 1px 1px 3px #a7c7c5;
+    }
+    #start-btn {
       background-color: #4db6ac;
-      margin: 10px 0;
       color: white;
-      line-height: 40px;
-      padding-left: 10px;
-      border-radius: 8px;
-      text-align: left;
+      font-size: 22px;
+      font-weight: 700;
+      border: none;
+      border-radius: 12px;
+      padding: 15px 25px;
+      cursor: pointer;
+      margin-bottom: 25px;
+      width: 90%;
+      max-width: 500px;
+      transition: background-color 0.3s;
+    }
+    #start-btn:hover {
+      background-color: #00897b;
+    }
+    canvas {
+      max-width: 100%;
+      height: auto !important;
     }
   </style>
 </head>
 <body>
-  <h1>Panel del Host</h1>
+  <h1>Panel de Control</h1>
   <div id="connected-count">Conectados: 0</div>
-  <button id="start-btn">Iniciar encuesta</button>
-  <div id="countdown" style="font-size: 36px; margin-top: 20px;"></div>
-  <div id="bar-container"></div>
+  <button id="start-btn">Iniciar Encuesta</button>
+
+  <div id="countdown" style="display:none;"></div>
+
+  <div id="results-container" style="display:none;">
+    <canvas id="results-chart"></canvas>
+  </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-    import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+    import {
+      getDatabase,
+      ref,
+      push,
+      onDisconnect,
+      onValue,
+      set,
+      update,
+      serverTimestamp,
+    } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
-    const app = initializeApp({
+    import Chart from "https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.esm.js";
+
+    const firebaseConfig = {
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
       authDomain: "poll-e8e49.firebaseapp.com",
       databaseURL: "https://poll-e8e49-default-rtdb.firebaseio.com",
       projectId: "poll-e8e49",
-      storageBucket: "poll-e8e49.appspot.com",
+      storageBucket: "poll-e8e49.firebasestorage.app",
       messagingSenderId: "957719245646",
-      appId: "1:957719245646:web:490403f5587901efcde41f"
-    });
+      appId: "1:957719245646:web:490403f5587901efcde41f",
+    };
 
+    const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const connectedCount = document.getElementById("connected-count");
-    const countdown = document.getElementById("countdown");
-    const barContainer = document.getElementById("bar-container");
-    const startBtn = document.getElementById("start-btn");
+    const connectionsRef = ref(db, "connections");
+    const myConnRef = push(connectionsRef);
+    onDisconnect(myConnRef).remove();
+    set(myConnRef, true);
 
-    // Escuchar cantidad de conectados
-    const connRef = ref(db, "connections");
-    onValue(connRef, snap => {
-      const count = snap.val() || 0;
-      connectedCount.textContent = `Conectados: ${count}`;
+    const connectedCountElem = document.getElementById("connected-count");
+    onValue(connectionsRef, (snap) => {
+      const count = snap.size || 0;
+      connectedCountElem.textContent = `Conectados: ${count}`;
     });
 
-    const question = {
-      question: "¿Cuál es tu fruta favorita?",
-      options: ["Manzana", "Banana", "Naranja", "Pera"]
-    };
+    const questionIndexRef = ref(db, "host/questionIndex");
+    const answersRef = ref(db, "answers");
+
+    const questions = [
+      {
+        text: "¿Cuál es tu color favorito?",
+        options: ["Rojo", "Azul", "Verde", "Amarillo"],
+      },
+      {
+        text: "¿Cuál es tu comida preferida?",
+        options: ["Pizza", "Sushi", "Hamburguesa", "Ensalada"],
+      },
+    ];
+
+    const startBtn = document.getElementById("start-btn");
+    const countdownElem = document.getElementById("countdown");
+    const resultsContainer = document.getElementById("results-container");
+    const ctx = document.getElementById("results-chart").getContext("2d");
+
+    let currentQuestionIndex = -1;
+    let countdownTimer = null;
+    const countdownDuration = 15; // segundos para responder
 
     startBtn.onclick = () => {
-      set(ref(db, "votes"), {});
-      set(ref(db, "currentQuestion"), question);
-      countdown.textContent = "5";
-      let time = 5;
-      const interval = setInterval(() => {
-        time--;
-        if (time > 0) {
-          countdown.textContent = time;
-        } else {
-          clearInterval(interval);
-          countdown.textContent = "Resultados:";
-          showResults();
-        }
-      }, 1000);
+      if (currentQuestionIndex === -1) {
+        currentQuestionIndex = 0;
+        updateQuestionIndex(currentQuestionIndex);
+        startBtn.disabled = true;
+        runCountdown();
+      }
     };
 
-    function showResults() {
-      const votesRef = ref(db, "votes");
-      onValue(votesRef, snap => {
-        const votes = snap.val() || {};
-        barContainer.innerHTML = "";
-        question.options.forEach(opt => {
-          const val = votes[opt] || 0;
-          const div = document.createElement("div");
-          div.className = "bar";
-          div.style.width = `${10 + val * 10}px`;
-          div.textContent = `${opt}: ${val}`;
-          barContainer.appendChild(div);
+    function updateQuestionIndex(index) {
+      set(questionIndexRef, index);
+    }
+
+    async function runCountdown() {
+      countdownElem.style.display = "block";
+      resultsContainer.style.display = "none";
+
+      for (let i = countdownDuration; i >= 0; i--) {
+        countdownElem.textContent = `Tiempo restante: ${i}s`;
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      countdownElem.style.display = "none";
+
+      // Mostrar resultados para la pregunta actual
+      showResults(currentQuestionIndex);
+
+      // Después de mostrar resultados, habilitar botón para siguiente pregunta si hay más
+      if (currentQuestionIndex + 1 < questions.length) {
+        startBtn.textContent = "Siguiente Pregunta";
+        startBtn.disabled = false;
+        startBtn.onclick = () => {
+          currentQuestionIndex++;
+          updateQuestionIndex(currentQuestionIndex);
+          startBtn.disabled = true;
+          resultsContainer.style.display = "none";
+          runCountdown();
+        };
+      } else {
+        startBtn.textContent = "Encuesta finalizada";
+        startBtn.disabled = true;
+        set(questionIndexRef, null);
+      }
+    }
+
+    function showResults(questionIdx) {
+      resultsContainer.style.display = "block";
+
+      onValue(ref(db, `answers/${questionIdx}`), (snap) => {
+        const data = snap.val() || {};
+        // Contar respuestas
+        const counts = Array(questions[questionIdx].options.length).fill(0);
+        Object.values(data).forEach((v) => {
+          if (typeof v === "number" && v >= 0 && v < counts.length) {
+            counts[v]++;
+          }
         });
+
+        renderChart(questions[questionIdx].options, counts);
+      }, { onlyOnce: true });
+    }
+
+    let chartInstance = null;
+    function renderChart(labels, data) {
+      if (chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [{
+            label: "Cantidad de votos",
+            data,
+            backgroundColor: "rgba(77, 182, 172, 0.8)",
+            borderColor: "rgba(38, 166, 154, 1)",
+            borderWidth: 1,
+            borderRadius: 6,
+          }],
+        },
+        options: {
+          responsive: true,
+          animation: {
+            duration: 800,
+            easing: 'easeOutQuart',
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { stepSize: 1, precision: 0 }
+            }
+          },
+          plugins: {
+            legend: {
+              display: false,
+            },
+          },
+        },
       });
     }
   </script>
