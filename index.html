@@ -73,19 +73,22 @@
     }
 
     // 7) Ahora que existe un estado, enganchamos el listener
-    onValue(hostRef, snap2 => {
-      const data = snap2.val();
-      // Si host aún no activó, quedamos en sala de espera
-      if (!data || data.active !== true) {
+    let initialized = false;
+    onValue(hostRef, snap => {
+      if (!initialized) {
+      // Ignoramos el primer callback con el estado actual (a veces viejo)
+      initialized = true;
+      return;
+    }
+    const data = snap.val();
+    if (data && data.active === true && typeof data.questionIndex === "number") {
+      if (data.questionIndex !== lastIdx) {
+        lastIdx = data.questionIndex;
+        startQuestion(data.questionIndex);
+      } else {
+        // Sala de espera
         waitingDiv.style.display = "";
         qSection.style.display   = "none";
-        return;
-      }
-      // Si host activó con un índice válido
-      const idx = data.questionIndex;
-      if (typeof idx === "number" && idx !== lastIdx) {
-        lastIdx = idx;
-        startQuestion(idx);
       }
     });
   })();
