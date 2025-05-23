@@ -5,44 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="index_style.css">
 
-  <style>
-    #pregunta, #opciones, #espera {
-      margin-top: 2em;
-    }
-
-    .opcion {
-      background: white;
-      color: black;
-      padding: 1em;
-      margin: 0.5em auto;
-      width: 80%;
-      max-width: 300px;
-      border-radius: 10px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: transform 0.2s;
-    }
-
-    .opcion:hover {
-      transform: scale(1.05);
-      background-color: #a5f3fc;
-    }
-
-    .opcion.votada {
-      background-color: #a5f3fc;
-    }
-  </style>
-</head>
-<body>
-  <h1>¡Bienvenidos!</h1>
-  <div id="espera">Esperando que comience la encuesta...</div>
-  <div id="pregunta" style="display:none;"></div>
-  <div id="opciones"></div>
-
-  <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-    import { getDatabase, ref, onValue, runTransaction, increment } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+    import { getDatabase, ref, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
@@ -56,81 +21,67 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
-    const salaRef = ref(db, "sala1");
 
-    let preguntaActual = null;
-    let yaVote = false;
+    const questionText = document.getElementById("question-text");
+    const optionsDiv = document.getElementById("options");
 
-    // Incrementar cantidad de conectados
-    const conectadosRef = ref(db, "sala1/conectados");
-    runTransaction(conectadosRef, (n) => (n || 0) + 1);
+    let currentQuestion = null;
+    let answered = false;
 
-    // Escuchar estado de la encuesta
-    onValue(salaRef, (snapshot) => {
-      const data = snapshot.val();
-      if (!data) return;
+    function renderQuestion(data) {
+      const { question, options } = data;
+      questionText.textContent = question;
+      optionsDiv.innerHTML = "";
 
-      if (data.estado === "esperando") {
-        document.getElementById("espera").style.display = "block";
-        document.getElementById("pregunta").style.display = "none";
-        document.getElementById("opciones").innerHTML = "";
-        yaVote = false;
-      } else if (data.estado === "activa") {
-        preguntaActual = data.preguntaActual || 0;
-        mostrarPregunta(preguntaActual);
+      options.forEach(opt => {
+        const container = document.createElement("div");
+        container.className = "option-container";
+
+        const div = document.createElement("div");
+        div.className = "option";
+        div.textContent = opt;
+
+        div.addEventListener("click", () => {
+          if (answered) return;
+          answered = true;
+          vote(opt);
+          div.classList.add("disabled");
+        });
+
+        container.appendChild(div);
+        optionsDiv.appendChild(container);
+      });
+    }
+
+    function vote(option) {
+      const voteRef = ref(db, `votes/${currentQuestion}/${option}`);
+      runTransaction(voteRef, current => (current || 0) + 1);
+    }
+
+    // Escuchar inicio de encuesta
+    const stateRef = ref(db, "state");
+    onValue(stateRef, (snapshot) => {
+      const state = snapshot.val();
+      if (state && state.started && state.currentQuestion) {
+        currentQuestion = state.currentQuestion;
+        answered = false;
+
+        const questionRef = ref(db, `questions/${currentQuestion}`);
+        onValue(questionRef, (snap) => {
+          const qData = snap.val();
+          if (qData) renderQuestion(qData);
+        });
+      } else {
+        questionText.textContent = "Esperando que el host inicie la encuesta...";
+        optionsDiv.innerHTML = "";
       }
     });
-
-    // Preguntas
-    const preguntas = [
-      {
-        texto: "¿Cuál es tu color favorito?",
-        opciones: ["Rojo", "Azul", "Verde", "Amarillo"]
-      },
-      {
-        texto: "¿Cuál es tu animal favorito?",
-        opciones: ["Perro", "Gato", "Pez", "Pájaro"]
-      },
-      {
-        texto: "¿Cuál es tu estación favorita?",
-        opciones: ["Verano", "Invierno", "Otoño", "Primavera"]
-      }
-    ];
-
-    function mostrarPregunta(index) {
-      yaVote = false;
-      const p = preguntas[index];
-      if (!p) return;
-
-      document.getElementById("espera").style.display = "none";
-      document.getElementById("pregunta").textContent = p.texto;
-      document.getElementById("pregunta").style.display = "block";
-
-      const opcionesDiv = document.getElementById("opciones");
-      opcionesDiv.innerHTML = "";
-
-      p.opciones.forEach(opcion => {
-        const div = document.createElement("div");
-        div.textContent = opcion;
-        div.className = "opcion";
-        div.onclick = () => votar(opcion);
-        opcionesDiv.appendChild(div);
-      });
-    }
-
-    function votar(opcion) {
-      if (yaVote || preguntaActual === null) return;
-
-      yaVote = true;
-      const ruta = `sala1/votos/q${preguntaActual}/${opcion}`;
-      const votoRef = ref(db, ruta);
-      runTransaction(votoRef, (n) => (n || 0) + 1);
-
-      document.querySelectorAll(".opcion").forEach(el => {
-        el.classList.add("votada");
-        el.onclick = null;
-      });
-    }
   </script>
+</head>
+  
+<body>
+  <h1>¡Bienvenido a la encuesta!</h1>
+  <div id="question-text">Cargando pregunta...</div>
+  <div id="options"></div>
 </body>
 </html>
