@@ -75,25 +75,14 @@
     Tu navegador no soporta audio HTML5.
   </audio>
 
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js">
-    QRCode.toDataURL(window.location.href)
-  .then((url) => {
-    const img = document.createElement("img");
-    img.src = url;
-    img.alt = "QR code para la encuesta";
-    img.style.width = "150px";
-    document.getElementById("qr-code").appendChild(img);
-  })
-  .catch((err) => {
-    console.error("Error generando QR:", err);
-  });
+  <!-- Firebase App y Database UMD -->
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.11.0/firebase-database-compat.js"></script>
 
-  </script>
+  <!-- QRCode UJS -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-    import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
-
     // Tu configuración Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
@@ -203,6 +192,19 @@
     });
 
     showQuestion();
+
+     QRCode.toDataURL(window.location.href)
+  .then((url) => {
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = "QR code para la encuesta";
+    img.style.width = "150px";
+    document.getElementById("qr-code").appendChild(img);
+  })
+  .catch((err) => {
+    console.error("Error generando QR:", err);
+  });
+
   </script>
 </body>
 </html>
