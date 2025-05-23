@@ -11,7 +11,7 @@
   <button id="start-btn">Iniciar Encuesta</button>
   <div id="countdown" style="font-size:2em; margin:20px 0;"></div>
   <h2 id="question-text"></h2>
-  <canvas id="chart" style="max-width:90%;"></canvas>
+  <canvas id="chart" style="max-width:90%; display:none;"></canvas>
   <button id="next-btn" style="display:none;">Siguiente Pregunta</button>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -19,11 +19,11 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import {
       getDatabase, ref, onValue,
-      set, push, onDisconnect
+      set, runTransaction, onDisconnect
     } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
-    // 1) Inicializa Firebase (reemplaza con tu config)
-     const firebaseConfig = {
+    // 1) Config Firebase
+    const firebaseConfig = {
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
       authDomain: "poll-e8e49.firebaseapp.com",
       databaseURL: "https://poll-e8e49-default-rtdb.firebaseio.com",
@@ -33,40 +33,49 @@
       appId: "1:957719245646:web:490403f5587901efcde41f",
     };
     const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+    const db  = getDatabase(app);
 
-    // 2) Presencia del host (opcional, puede omitirse)
+    // 2) Presencia
     const connectionsRef = ref(db, "connections");
+    const myConn = runTransaction(runTransaction); // dummy to import runTransaction
+    const connPush = ref(db, "connections");
+    const myNode = runTransaction; // dummy
+    //-- skip presence for host if desired --
 
-    // 3) Mostrar cantidad de conectados
-    const connectedCountDiv = document.getElementById("connected-count");
+    // 3) Contador de conectados
     onValue(connectionsRef, snap => {
       const data = snap.val() || {};
-      connectedCountDiv.textContent = `Conectados: ${Object.keys(data).length}`;
+      document.getElementById("connected-count")
+        .textContent = `Conectados: ${Object.keys(data).length}`;
     });
 
     // 4) Preguntas
     const preguntas = [
-      { text: "¿Cuál es tu color favorito?",   options: ["Rojo","Azul","Verde","Amarillo"] },
-      { text: "¿Cuál es tu animal favorito?",  options: ["Perro","Gato","Pez","Pájaro"] },
-      { text: "¿Qué estación prefieres?",      options: ["Verano","Invierno","Otoño","Primavera"] }
+      { text:"¿Cuál es tu color favorito?",   options:["Rojo","Azul","Verde","Amarillo"] },
+      { text:"¿Cuál es tu animal favorito?",  options:["Perro","Gato","Pez","Pájaro"] },
+      { text:"¿Qué estación prefieres?",      options:["Verano","Invierno","Otoño","Primavera"] }
     ];
 
-    // 5) UI
+    // 5) UI refs
     const startBtn = document.getElementById("start-btn");
     const nextBtn  = document.getElementById("next-btn");
-    const countdownEl  = document.getElementById("countdown");
+    const cdDiv    = document.getElementById("countdown");
     const qText    = document.getElementById("question-text");
-    const chartCtx = document.getElementById("chart").getContext("2d");
-    let chartInstance = null, current = -1;
+    const chartEl  = document.getElementById("chart");
+    let chartInst  = null, current = -1;
 
-    // 6) Ramas en BD
+    // 6) Control DB
     const hostRef = ref(db, "host");
+    // Inicializar hostRef
+    onValue(hostRef, snap => {
+      if (snap.val() === null) {
+        set(hostRef, { active:false, questionIndex:null });
+      }
+    }, { onlyOnce:true });
 
-    // 7) Iniciar encuesta
     startBtn.onclick = () => {
       current = 0;
-      set(hostRef, { active: true, questionIndex: current });
+      set(hostRef, { active:true, questionIndex:0 });
       startBtn.style.display = "none";
       nextBtn.style.display  = "none";
       runRound();
@@ -74,66 +83,53 @@
 
     nextBtn.onclick = () => {
       current++;
-      set(hostRef, { active: true, questionIndex: current });
+      set(hostRef, { active:true, questionIndex:current });
       nextBtn.style.display = "none";
       runRound();
     };
 
-    // 8) Ejecutar ciclo pregunta→countdown→resultados
     function runRound() {
-      // mostrar pregunta
       const p = preguntas[current];
       qText.textContent = p.text;
-      countdownEl.textContent = `Tiempo restante: 15s`;
-      if (chartInstance) { chartInstance.destroy(); }
-      document.getElementById("chart").style.display = "none";
+      cdDiv.textContent = `Tiempo restante: 15s`;
+      chartEl.style.display = "none";
+      if (chartInst) chartInst.destroy();
 
-      // countdown
       let t = 15;
       const iv = setInterval(() => {
         t--;
-        countdownEl.textContent = `Tiempo restante: ${t}s`;
+        cdDiv.textContent = `Tiempo restante: ${t}s`;
         if (t <= 0) {
           clearInterval(iv);
-          countdownEl.textContent = "";
+          cdDiv.textContent = "";
           showResults();
         }
       }, 1000);
     }
 
-    // 9) Mostrar gráfico de Chart.js
     function showResults() {
       const vr = ref(db, `votes/q${current}`);
       onValue(vr, snap => {
-        const data = snap.val() || {};    // { "Rojo": 2, "Azul": 1, ... }
-        const labels = preguntas[current].options;
-        const counts = labels.map(opt => data[opt] || 0);
-        drawChart(labels, counts);
-      }, { onlyOnce: true });
+        const data = snap.val() || {};
+        const counts = preguntas[current].options.map(opt =>
+          data[opt] || 0
+        );
+        drawChart(preguntas[current].options, counts);
+      }, { onlyOnce:true });
     }
 
     function drawChart(labels, data) {
-      document.getElementById("chart").style.display = "";
-      chartInstance = new Chart(chartCtx, {
+      chartEl.style.display = "";
+      const ctx = chartEl.getContext("2d");
+      chartInst = new Chart(ctx, {
         type: 'bar',
-        data: {
-          labels,
-          datasets: [{ label: 'Votos', data }]
-        },
-        options: {
-          scales: { y: { beginAtZero:true, ticks:{stepSize:1} } }
-        }
+        data: { labels, datasets:[{ label:'Votos', data }] },
+        options:{ scales:{ y:{ beginAtZero:true, ticks:{stepSize:1} } } }
       });
-      // botón siguiente si hay más preguntas
-      if (current + 1 < preguntas.length) {
+      if (current+1 < preguntas.length) {
         nextBtn.style.display = "";
-      }
-      else {
-        // Encuesta finalizada
-        set(hostRef, { active: false, finished: true });
-        startBtn.style.display = "none";
-        nextBtn.style.display  = "none";
-        qText.textContent = "Encuesta finalizada.";
+      } else {
+        set(hostRef, { active:false, questionIndex:null });
       }
     }
   </script>
