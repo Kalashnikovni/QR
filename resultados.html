@@ -42,10 +42,12 @@
 
     // 3) Escucha el número de hijos en /connections
     const countDiv = document.getElementById("connected-count");
-    onValue(connectionsRef, snapshot => {
-      const n = snapshot.numChildren(); 
-      countDiv.textContent = `Conectados: ${n}`;
+    onValue(connectionsRef, snap => {
+      const data = snap.val() || {};
+      const count = Object.keys(data).length;
+      onnectedCountDiv.textContent = `Conectados: ${count}`;
     });
+
   </script>
 </body>
 </html>
