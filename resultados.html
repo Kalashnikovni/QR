@@ -1,109 +1,23 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
-  <meta charset="UTF-8" />
-  <title>Resultados de la Encuesta</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: 'Poppins', sans-serif;
-      animation: gradient 15s ease infinite;
-      background: linear-gradient(-45deg, #a8edea, #7ed6df, #70c1b3, #3fada8);
-      background-size: 400% 400%;
-      text-align: center;
-      padding: 30px;
-      color: #333;
-    }
-
-    @keyframes gradient {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-
-    h1 {
-      font-size: 48px;
-      font-weight: 800;
-      color: #ffffff;
-      text-shadow: 2px 2px 6px rgba(0,0,0,0.2);
-      margin-bottom: 10px;
-      letter-spacing: 1px;
-      transition: all 0.3s ease;
-    }
-
-    #question {
-      font-size: 28px;
-      font-weight: 600;
-      color: #f0fdfd;
-      text-shadow: 1px 1px 4px rgba(0,0,0,0.2);
-      margin: 20px 0;
-      transition: all 0.3s ease;
-    }
-
-    #chart-container {
-      width: 90%;
-      max-width: 800px;
-      margin: 0 auto;
-      background: rgba(255, 255, 255, 0.85);
-      border-radius: 16px;
-      padding: 30px;
-      margin: 0 auto;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-    }
-
-  canvas {
-    width: 100% !important;
-    max-width: 700px;
-    height: auto !important;
-    border-radius: 12px;
-  }
-    .nav-buttons {
-      margin-top: 30px;
-    }
-    button {
-      padding: 10px 20px;
-      margin: 0 10px;
-      font-size: 16px;
-      background-color: #4db6ac;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-    button:disabled {
-      background-color: #ccc;
-      cursor: not-allowed;
-    }
-  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resultados en Vivo</title>
+  <link rel="stylesheet" href="index_style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <h1>Respuestas</h1>
-  <div id="question">Cargando pregunta...</div>
-  <div id="chart-container">
-  <canvas id="chart"></canvas>
-  </div>
-  <div class="nav-buttons">
-    <button id="prev">Anterior</button>
-    <button id="next">Siguiente</button>
-  </div>
+  <h1>Resultados en Vivo</h1>
+  <p id="connected">Conectados: 0</p>
+  <div id="countdown" style="font-size: 48px; margin: 30px;">Esperando...</div>
+  <canvas id="resultsChart" style="max-width: 90%; margin: auto; display: none;"></canvas>
 
-  <!-- Firebase y Chart.js -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
     import {
-    Chart,
-    BarController,
-    BarElement,
-    CategoryScale,
-    LinearScale,
-    Tooltip,
-    Legend
-  } from "https://esm.sh/chart.js";
-
-    // Registrar componentes necesarios
-  Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
+      getDatabase, ref, onValue, set, get, child
+    } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
@@ -118,87 +32,75 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const questions = [
-      {
-        question: "¿Cuál es tu color favorito?",
-        options: ["Rojo", "Azul", "Verde", "Amarillo"],
-      },
-      {
-        question: "¿Cuál es tu animal favorito?",
-        options: ["Perro", "Gato", "Pez", "Pájaro"],
-      },
-      {
-        question: "¿Cuál es tu estación favorita?",
-        options: ["Verano", "Invierno", "Otoño", "Primavera"],
-      },
-    ];
+    const questionIndex = 0; // índice de la pregunta actual
+    const countdownEl = document.getElementById("countdown");
+    const chartCanvas = document.getElementById("resultsChart");
 
-    let current = 0;
-    const questionEl = document.getElementById("question");
-    const prevBtn = document.getElementById("prev");
-    const nextBtn = document.getElementById("next");
-    const ctx = document.getElementById("chart").getContext("2d");
+    // Iniciar encuesta
+    async function startPoll(durationSeconds = 10) {
+      await set(ref(db, "pollStatus"), { started: true, question: questionIndex });
 
-    let chart = new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels: [],
-        datasets: [{
-          label: "Votos",
-          data: [],
-          backgroundColor: "#4dd0e1",
-          borderRadius: 6
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { display: false }
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: { precision: 0 }
-          }
+      let timeLeft = durationSeconds;
+      countdownEl.textContent = `Tiempo restante: ${timeLeft}s`;
+
+      const interval = setInterval(() => {
+        timeLeft--;
+        countdownEl.textContent = `Tiempo restante: ${timeLeft}s`;
+        if (timeLeft <= 0) {
+          clearInterval(interval);
+          showResults();
         }
-      }
-    });
-
-    function updateChart(votesData) {
-      const qKey = `q${current}`;
-      const qData = questions[current];
-      const votos = votesData?.[qKey] || {};
-
-      const labels = qData.options;
-      const data = labels.map(opt => votos[opt] || 0);
-
-      questionEl.textContent = qData.question;
-      chart.data.labels = labels;
-      chart.data.datasets[0].data = data;
-      chart.update();
-
-      prevBtn.disabled = current === 0;
-      nextBtn.disabled = current === questions.length - 1;
+      }, 1000);
     }
 
-    onValue(ref(db, "votes"), (snapshot) => {
-      const votesData = snapshot.val();
-      updateChart(votesData);
+    // Mostrar resultados como gráfico
+    function showResults() {
+      countdownEl.style.display = "none";
+      chartCanvas.style.display = "block";
+
+      const voteRef = ref(db, `votes/q${questionIndex}`);
+      onValue(voteRef, (snapshot) => {
+        const data = snapshot.val();
+        if (!data) return;
+
+        const labels = Object.keys(data);
+        const counts = Object.values(data);
+
+        new Chart(chartCanvas, {
+          type: "bar",
+          data: {
+            labels: labels,
+            datasets: [{
+              label: "Votos",
+              data: counts,
+              backgroundColor: "#4db6ac",
+              borderRadius: 8
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  precision: 0
+                }
+              }
+            }
+          }
+        });
+      });
+    }
+
+    // Mostrar cantidad de conectados
+    const connectionsRef = ref(db, "connections");
+    onValue(connectionsRef, (snapshot) => {
+      const count = snapshot.size || Object.keys(snapshot.val() || {}).length;
+      document.getElementById("connected").textContent = `Conectados: ${count}`;
     });
 
-    prevBtn.addEventListener("click", () => {
-      if (current > 0) current--;
-      onValue(ref(db, "votes"), (snapshot) => {
-        updateChart(snapshot.val());
-      }, { onlyOnce: true });
-    });
-
-    nextBtn.addEventListener("click", () => {
-      if (current < questions.length - 1) current++;
-      onValue(ref(db, "votes"), (snapshot) => {
-        updateChart(snapshot.val());
-      }, { onlyOnce: true });
-    });
+    // Iniciar encuesta automáticamente
+    startPoll(10);
   </script>
 </body>
 </html>
