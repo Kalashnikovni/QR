@@ -4,165 +4,108 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Resultados</title>
-  <link rel="stylesheet" href="index_style.css" />
+  <link rel="stylesheet" href="estilos.css" />
   <style>
-    #start-btn, #next-btn {
-      margin-top: 20px;
-      font-size: 22px;
-      padding: 12px 25px;
-      background-color: #4db6ac;
-      color: white;
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-    }
-    #countdown {
-      font-size: 40px;
-      color: white;
+    #connected-count {
+      font-size: 20px;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 10px;
+      border-radius: 10px;
+      display: inline-block;
       margin-top: 20px;
     }
     #bar-container {
-      margin-top: 30px;
+      margin: 40px auto;
+      max-width: 600px;
+      background: #ffffffcc;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.15);
     }
     .bar {
-      height: 30px;
-      margin: 10px auto;
-      background-color: #26a69a;
+      height: 40px;
+      background-color: #4db6ac;
+      margin: 10px 0;
       color: white;
-      text-align: left;
+      line-height: 40px;
       padding-left: 10px;
-      border-radius: 10px;
-      font-weight: bold;
+      border-radius: 8px;
+      text-align: left;
     }
-
-    #connected-count {
-  font-size: 22px;
-  font-weight: bold;
-  color: #ffffff;
-  background: rgba(0, 150, 136, 0.8);
-  padding: 12px 20px;
-  border-radius: 10px;
-  display: inline-block;
-  margin-top: 20px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-}
-
-    #results-container {
-  margin-top: 40px;
-  background-color: rgba(255, 255, 255, 0.85);
-  border-radius: 20px;
-  padding: 20px;
-  max-width: 700px;
-  margin-left: auto;
-  margin-right: auto;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
-}
   </style>
 </head>
 <body>
   <h1>Panel del Host</h1>
   <div id="connected-count">Conectados: 0</div>
-  <div id="question-text">Esperando a comenzar…</div>
-  <button id="start-btn">Iniciar Encuesta</button>
-  <div id="countdown"></div>
-  <div id="results-container"></div>
-  <button id="next-btn" style="display:none">Siguiente Pregunta</button>
+  <button id="start-btn">Iniciar encuesta</button>
+  <div id="countdown" style="font-size: 36px; margin-top: 20px;"></div>
+  <div id="bar-container"></div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-    import { getDatabase, ref, onValue, set, runTransaction } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+    import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
-    const firebaseConfig = {
+    const app = initializeApp({
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
       authDomain: "poll-e8e49.firebaseapp.com",
       databaseURL: "https://poll-e8e49-default-rtdb.firebaseio.com",
       projectId: "poll-e8e49",
-      storageBucket: "poll-e8e49.firebasestorage.app",
+      storageBucket: "poll-e8e49.appspot.com",
       messagingSenderId: "957719245646",
       appId: "1:957719245646:web:490403f5587901efcde41f"
-    };
+    });
 
-    const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const startBtn = document.getElementById("start-btn");
-    const nextBtn = document.getElementById("next-btn");
-    const questionText = document.getElementById("question-text");
-    const countdownEl = document.getElementById("countdown");
+    const connectedCount = document.getElementById("connected-count");
+    const countdown = document.getElementById("countdown");
     const barContainer = document.getElementById("bar-container");
-    const connectedCountEl = document.getElementById("connected-count");
+    const startBtn = document.getElementById("start-btn");
 
-    const questions = [
-      { question: "¿Cuál es tu color favorito?", options: ["Rojo", "Azul", "Verde", "Amarillo"] },
-      { question: "¿Cuál es tu animal favorito?", options: ["Perro", "Gato", "Pez", "Pájaro"] },
-      { question: "¿Cuál es tu estación favorita?", options: ["Verano", "Invierno", "Otoño", "Primavera"] },
-    ];
+    // Escuchar cantidad de conectados
+    const connRef = ref(db, "connections");
+    onValue(connRef, snap => {
+      const count = snap.val() || 0;
+      connectedCount.textContent = `Conectados: ${count}`;
+    });
 
-    let current = 0;
+    const question = {
+      question: "¿Cuál es tu fruta favorita?",
+      options: ["Manzana", "Banana", "Naranja", "Pera"]
+    };
 
-    // Mostrar cantidad de conectados
-    const connectedRef = ref(db, "connectedUsers");
-
-onValue(connectedRef, (snapshot) => {
-  const count = snapshot.size || Object.keys(snapshot.val() || {}).length;
-  document.getElementById("connected-count").textContent = `Conectados: ${count}`;
-});
-    // Iniciar encuesta
     startBtn.onclick = () => {
-      set(ref(db, "state"), { status: "active", current: 0 });
-      startBtn.style.display = "none";
-      mostrarCuentaRegresivaYResultados();
-    };
-
-    nextBtn.onclick = () => {
-      current++;
-      if (current < questions.length) {
-        set(ref(db, "state"), { status: "active", current });
-        mostrarCuentaRegresivaYResultados();
-      } else {
-        set(ref(db, "state"), { status: "finished" });
-        questionText.textContent = "Encuesta finalizada.";
-        countdownEl.textContent = "";
-        barContainer.innerHTML = "";
-        nextBtn.style.display = "none";
-      }
-    };
-
-    function mostrarCuentaRegresivaYResultados() {
-      const q = questions[current];
-      questionText.textContent = q.question;
-      barContainer.innerHTML = "";
-      countdownEl.textContent = "5";
-      let count = 5;
-      const timer = setInterval(() => {
-        count--;
-        countdownEl.textContent = count;
-        if (count === 0) {
-          clearInterval(timer);
-          countdownEl.textContent = "";
-          mostrarResultados(q.options);
-          nextBtn.style.display = "inline-block";
+      set(ref(db, "votes"), {});
+      set(ref(db, "currentQuestion"), question);
+      countdown.textContent = "5";
+      let time = 5;
+      const interval = setInterval(() => {
+        time--;
+        if (time > 0) {
+          countdown.textContent = time;
+        } else {
+          clearInterval(interval);
+          countdown.textContent = "Resultados:";
+          showResults();
         }
       }, 1000);
-    }
+    };
 
-    function mostrarResultados(options) {
-      const qKey = `q${current}`;
-      onValue(ref(db, `votes/${qKey}`), (snap) => {
-        const data = snap.val() || {};
-        const total = Object.values(data).reduce((a, b) => a + b, 0) || 1;
+    function showResults() {
+      const votesRef = ref(db, "votes");
+      onValue(votesRef, snap => {
+        const votes = snap.val() || {};
         barContainer.innerHTML = "";
-
-        options.forEach((opt) => {
-          const val = data[opt] || 0;
-          const pct = ((val / total) * 100).toFixed(1);
-          const bar = document.createElement("div");
-          bar.className = "bar";
-          bar.style.width = pct + "%";
-          bar.textContent = `${opt} (${pct}%)`;
-          barContainer.appendChild(bar);
+        question.options.forEach(opt => {
+          const val = votes[opt] || 0;
+          const div = document.createElement("div");
+          div.className = "bar";
+          div.style.width = `${10 + val * 10}px`;
+          div.textContent = `${opt}: ${val}`;
+          barContainer.appendChild(div);
         });
-      }, { onlyOnce: true });
+      });
     }
   </script>
 </body>
