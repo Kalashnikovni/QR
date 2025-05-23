@@ -1,23 +1,53 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Resultados en Vivo</title>
-  <link rel="stylesheet" href="index_style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Resultados</title>
+  <link rel="stylesheet" href="estilos.css" />
+  <style>
+    #start-btn, #next-btn {
+      margin-top: 20px;
+      font-size: 22px;
+      padding: 12px 25px;
+      background-color: #4db6ac;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+    #countdown {
+      font-size: 40px;
+      color: white;
+      margin-top: 20px;
+    }
+    #bar-container {
+      margin-top: 30px;
+    }
+    .bar {
+      height: 30px;
+      margin: 10px auto;
+      background-color: #26a69a;
+      color: white;
+      text-align: left;
+      padding-left: 10px;
+      border-radius: 10px;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
-  <h1>Resultados en Vivo</h1>
-  <p id="connected">Conectados: 0</p>
-  <div id="countdown" style="font-size: 48px; margin: 30px;">Esperando...</div>
-  <canvas id="resultsChart" style="max-width: 90%; margin: auto; display: none;"></canvas>
+  <h1>Panel del Host</h1>
+  <div id="connected-count">Conectados: 0</div>
+  <div id="question-text">Esperando a comenzar…</div>
+  <button id="start-btn">Iniciar Encuesta</button>
+  <div id="countdown"></div>
+  <div id="bar-container"></div>
+  <button id="next-btn" style="display:none">Siguiente Pregunta</button>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-    import {
-      getDatabase, ref, onValue, set, get, child
-    } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+    import { getDatabase, ref, onValue, set, runTransaction } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
@@ -32,75 +62,84 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const questionIndex = 0; // índice de la pregunta actual
+    const startBtn = document.getElementById("start-btn");
+    const nextBtn = document.getElementById("next-btn");
+    const questionText = document.getElementById("question-text");
     const countdownEl = document.getElementById("countdown");
-    const chartCanvas = document.getElementById("resultsChart");
+    const barContainer = document.getElementById("bar-container");
+    const connectedCountEl = document.getElementById("connected-count");
+
+    const questions = [
+      { question: "¿Cuál es tu color favorito?", options: ["Rojo", "Azul", "Verde", "Amarillo"] },
+      { question: "¿Cuál es tu animal favorito?", options: ["Perro", "Gato", "Pez", "Pájaro"] },
+      { question: "¿Cuál es tu estación favorita?", options: ["Verano", "Invierno", "Otoño", "Primavera"] },
+    ];
+
+    let current = 0;
+
+    // Mostrar cantidad de conectados
+    const connectedRef = ref(db, "connected");
+    onValue(connectedRef, (snap) => {
+      connectedCountEl.textContent = "Conectados: " + (snap.val() || 0);
+    });
 
     // Iniciar encuesta
-    async function startPoll(durationSeconds = 10) {
-      await set(ref(db, "pollStatus"), { started: true, question: questionIndex });
+    startBtn.onclick = () => {
+      set(ref(db, "state"), { status: "active", current: 0 });
+      startBtn.style.display = "none";
+      mostrarCuentaRegresivaYResultados();
+    };
 
-      let timeLeft = durationSeconds;
-      countdownEl.textContent = `Tiempo restante: ${timeLeft}s`;
+    nextBtn.onclick = () => {
+      current++;
+      if (current < questions.length) {
+        set(ref(db, "state"), { status: "active", current });
+        mostrarCuentaRegresivaYResultados();
+      } else {
+        set(ref(db, "state"), { status: "finished" });
+        questionText.textContent = "Encuesta finalizada.";
+        countdownEl.textContent = "";
+        barContainer.innerHTML = "";
+        nextBtn.style.display = "none";
+      }
+    };
 
-      const interval = setInterval(() => {
-        timeLeft--;
-        countdownEl.textContent = `Tiempo restante: ${timeLeft}s`;
-        if (timeLeft <= 0) {
-          clearInterval(interval);
-          showResults();
+    function mostrarCuentaRegresivaYResultados() {
+      const q = questions[current];
+      questionText.textContent = q.question;
+      barContainer.innerHTML = "";
+      countdownEl.textContent = "5";
+      let count = 5;
+      const timer = setInterval(() => {
+        count--;
+        countdownEl.textContent = count;
+        if (count === 0) {
+          clearInterval(timer);
+          countdownEl.textContent = "";
+          mostrarResultados(q.options);
+          nextBtn.style.display = "inline-block";
         }
       }, 1000);
     }
 
-    // Mostrar resultados como gráfico
-    function showResults() {
-      countdownEl.style.display = "none";
-      chartCanvas.style.display = "block";
+    function mostrarResultados(options) {
+      const qKey = `q${current}`;
+      onValue(ref(db, `votes/${qKey}`), (snap) => {
+        const data = snap.val() || {};
+        const total = Object.values(data).reduce((a, b) => a + b, 0) || 1;
+        barContainer.innerHTML = "";
 
-      const voteRef = ref(db, `votes/q${questionIndex}`);
-      onValue(voteRef, (snapshot) => {
-        const data = snapshot.val();
-        if (!data) return;
-
-        const labels = Object.keys(data);
-        const counts = Object.values(data);
-
-        new Chart(chartCanvas, {
-          type: "bar",
-          data: {
-            labels: labels,
-            datasets: [{
-              label: "Votos",
-              data: counts,
-              backgroundColor: "#4db6ac",
-              borderRadius: 8
-            }]
-          },
-          options: {
-            responsive: true,
-            scales: {
-              y: {
-                beginAtZero: true,
-                ticks: {
-                  precision: 0
-                }
-              }
-            }
-          }
+        options.forEach((opt) => {
+          const val = data[opt] || 0;
+          const pct = ((val / total) * 100).toFixed(1);
+          const bar = document.createElement("div");
+          bar.className = "bar";
+          bar.style.width = pct + "%";
+          bar.textContent = `${opt} (${pct}%)`;
+          barContainer.appendChild(bar);
         });
-      });
+      }, { onlyOnce: true });
     }
-
-    // Mostrar cantidad de conectados
-    const connectionsRef = ref(db, "connections");
-    onValue(connectionsRef, (snapshot) => {
-      const count = snapshot.size || Object.keys(snapshot.val() || {}).length;
-      document.getElementById("connected").textContent = `Conectados: ${count}`;
-    });
-
-    // Iniciar encuesta automáticamente
-    startPoll(10);
   </script>
 </body>
 </html>
