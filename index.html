@@ -30,7 +30,7 @@
       transition: all 0.3s ease;
     }
 
-    #question {
+    #question-text {
       font-size: 28px;
       font-weight: 600;
       color: #f0fdfd;
@@ -76,16 +76,7 @@
     }
 
     .progress-bar {
-      height: 24px;
-      background: #4dd0e1;
-      border-radius: 0 0 16px 16px;
-      color: white;
-      font-size: 14px;
-      font-weight: bold;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: width 0.4s;
+      display: none;
     }
 
     #next-btn {
@@ -197,21 +188,7 @@
     }
 
     function updateVotesDisplay(votes) {
-      const qKey = `q${current}`;
-      if (!votes || !votes[qKey]) return;
-
-      const total = Object.values(votes[qKey]).reduce((a, b) => a + b, 0);
-      if (total === 0) return;
-
-      document.querySelectorAll(".option-container").forEach((container) => {
-        const label = container.querySelector(".option").textContent;
-        const count = votes[qKey][label] || 0;
-        const percent = ((count / total) * 100).toFixed(1);
-
-        const bar = container.querySelector(".progress-bar");
-        bar.style.width = percent + "%";
-        bar.textContent = percent + "%";
-      });
+      
     }
 
     // Listener para los votos en Firebase
