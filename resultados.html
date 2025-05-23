@@ -54,7 +54,18 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
     import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
-    import { Chart } from "https://esm.sh/chart.js";
+    import {
+    Chart,
+    BarController,
+    BarElement,
+    CategoryScale,
+    LinearScale,
+    Tooltip,
+    Legend
+  } from "https://esm.sh/chart.js";
+
+    // Registrar componentes necesarios
+  Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
     const firebaseConfig = {
       apiKey: "AIzaSyCsYSsb-PsxTCKihp7ROVJsdBSFX3dMd2w",
