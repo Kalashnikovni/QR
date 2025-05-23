@@ -103,14 +103,12 @@
 
     // 9) Mostrar gráfico de Chart.js
     function showResults() {
-      const voteRef = ref(db, `votes/q${current}`);
-      onValue(voteRef, snap => {
-        const data = snap.val() || {};
-        // contamos cuántas veces aparece cada opción
-        const counts = preguntas[current].options.map(opt =>
-          Object.values(data).filter(v => v === opt).length
-        );
-        drawChart(preguntas[current].options, counts);
+      const vr = ref(db, `votes/q${current}`);
+      onValue(vr, snap => {
+        const data = snap.val() || {};    // { "Rojo": 2, "Azul": 1, ... }
+        const labels = preguntas[current].options;
+        const counts = labels.map(opt => data[opt] || 0);
+        drawChart(labels, counts);
       }, { onlyOnce: true });
     }
 
@@ -129,6 +127,13 @@
       // botón siguiente si hay más preguntas
       if (current + 1 < preguntas.length) {
         nextBtn.style.display = "";
+      }
+      else {
+        // Encuesta finalizada
+        set(hostRef, { active: false, finished: true });
+        startBtn.style.display = "none";
+        nextBtn.style.display  = "none";
+        qText.textContent = "Encuesta finalizada.";
       }
     }
   </script>
